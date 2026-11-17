@@ -1,0 +1,66 @@
+name: Pinout fix or missing pinout
+description: A part's pins are wrong, missing or in the wrong place
+title: "Pinout: "
+labels: ["pinout", "component-library"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping! Most people open this from the **"Pinout wrong or missing? Report it"** link in the tool, which fills in the first few boxes for you.
+  - type: input
+    id: component_id
+    attributes:
+      label: Component ID
+      description: Shown in Props → Component info → Type (e.g. mcu001)
+      placeholder: mcu001
+    validations:
+      required: true
+  - type: input
+    id: component_name
+    attributes:
+      label: Component name
+      placeholder: ESP32 DevKit V1
+  - type: dropdown
+    id: problem
+    attributes:
+      label: What's wrong?
+      options:
+        - Pin names are wrong
+        - Pins are in the wrong order or position
+        - Pins are missing
+        - Board size or mounting holes are wrong
+        - There's no pinout at all
+        - Pin capabilities/warnings are wrong (ADC, input-only, boot pins…)
+    validations:
+      required: true
+  - type: textarea
+    id: current_pins
+    attributes:
+      label: What the tool shows now
+      description: Filled in automatically when you use the link in the tool
+      render: text
+  - type: textarea
+    id: correct_pinout
+    attributes:
+      label: Correct pinout
+      description: |
+        Easiest format: one pin per line, going down the left header then down the right header, e.g.
+        `1 3V3`
+        `2 GND`
+        If you know positions in mm from the top-left corner, add them: `3V3 x=1.3 y=3.8`
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: Source
+      description: Datasheet, manufacturer page or a clear photo of the silkscreen
+      placeholder: https://…
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else?
+      description: Variants, revisions (e.g. "V1.1 swaps D2 and D4"), photos

@@ -1,0 +1,36 @@
+name: Request or add a component
+description: Ask for a part that isn't in the library, or share one you've built
+title: "Component: "
+labels: ["new-component", "component-library"]
+body:
+  - type: input
+    id: name
+    attributes:
+      label: Part name and model
+      placeholder: Adafruit Feather RP2040
+    validations:
+      required: true
+  - type: input
+    id: link
+    attributes:
+      label: Product page or datasheet
+      placeholder: https://…
+    validations:
+      required: true
+  - type: input
+    id: size
+    attributes:
+      label: Size (W × L × H mm)
+      placeholder: 22.8 × 50.8 × 7
+  - type: textarea
+    id: pins
+    attributes:
+      label: Pins
+      description: One per line, left header top to bottom then right header top to bottom
+      render: text
+  - type: textarea
+    id: json
+    attributes:
+      label: Component JSON (optional)
+      description: If you made it with "+ Add custom component", paste the JSON entry here — see CONTRIBUTING.md for the format
+      render: json

@@ -1,143 +1,54 @@
-# Wire Channel Board Designer
+# Wire Channel Designer
 
-> A browser-based EDA-style tool for designing **3D-printable wire-channel circuit boards** — no install, no backend, runs entirely in one HTML file.
+**Design 3D-printable circuit boards with grooves for your wires, right in your browser.**
+Drop parts on a board (or on any STL you like), auto-route the channels, check it in 3D, and export a watertight STL ready to slice. Then print it, lay hookup wire in the grooves, push the parts through and solder.
 
-**Live tool:** https://meteteq.github.io/wire-channel-designer
+**▶ Open the tool:** https://meteteq.github.io/wire-channel-designer
 
----
+No install, no account, no server. It's one HTML file and works offline.
 
-## What is the 3DPCB Method?
-
-The **3DPCB method** replaces traditional PCBs with 3D-printed PETG boards that have recessed wire-channel grooves machined into the surface. You:
-
-1. Print the board in PETG (or similar)
-2. Lay hookup wire into the channels
-3. Solder component legs directly where they cross
-
-No etching. No PCB fab. No soldermask. Just a printer, wire, and a soldering iron. Great for makers, accessibility device builders, one-offs, and rapid prototyping.
+Inspired by Johan von Konow's 3DPCB method (Print a Synth, 3DPCBoy).
 
 ---
 
-## Features
+## What it does
 
-- **133-component library** — microcontrollers, SBCs, sensors, motors, power management, ICs, passives, connectors, and more
-- **Drag-and-drop layout** — physical footprints with real mm dimensions
-- **Automatic wire channel routing** — right-angle pathfinding between matched net names
-- **Layer control** — route channels on top, bottom, or both sides
-- **Wire gauge / channel sizing** — set channel width and depth per project
-- **Net/signal labeling** — name nets (VCC, GND, SDA, SCL, etc.) and auto-color channels
-- **DRC** — warns about off-board components, overlaps, edge violations
-- **OpenSCAD export** — generates `.scad` with board body + channel cutouts
-- **BOM export** — CSV with all placed components
-- **Wiring legend export** — SVG of all nets and their colors
-- **Community component library** — import/export JSON to share custom component definitions
-- **Save/load** — full layout as JSON
-- **Zero install** — single `.html` file, works offline
+- **133 real parts** with sizes, heights, mounting holes and pin positions: ESP32 (classic, S3, C3, C6, H2), Raspberry Pi Pico / Pico 2, Arduino Uno / Nano / Mega / Pro Micro, STM32 Blue/Black Pill, Teensy 4.1, Pi 4/5/Zero 2, Jetson Orin Nano, BeagleBone, sensors, displays, motor drivers, power modules, ICs, pots, encoders, buttons, jacks and connectors.
+- **Any shape**: rectangle, rounded, circle, triangle, hexagon, a ready-made **enclosure box**, or **import your own STL** (a box from Thingiverse, a synth case…) and tap the face you want the parts on.
+- **Two-face auto-router**: channels avoid holes, keep apart from other signals and hop to the underside through a via when they'd otherwise cross.
+- **Pin-aware**: give each pin a net in Props. Power, ground, I²C and SPI pins connect themselves.
+- **📌 Pinout reference** for every part: what each pin can do (ADC, PWM, I²C, input-only, boot pins), plus warnings about common gotchas like ESP32 ADC2 + WiFi.
+- **Warning flags on the board**: red = must fix, orange = check, blue = tip. Catches pots on non-analog pins, 3V3 tied to 5V, shorts, holes colliding, parts off the board, knobs too close to turn, sockets away from the edge, and unrouted connections. Tap a flag to see why and how to fix it.
+- **3D view like Tinkercad**: drag to orbit, right-drag to pan, scroll or pinch to zoom, with Iso/Top/Front/Side/Under views and parts modelled at real size. Pick a filament colour and grab a screenshot.
+- **Tactile & accessible**: Grade 1 **Braille labels** (standard 1.5 mm dots, 2.5 mm spacing), tactile locator bumps, and knob locator rings, all printed as part of the board.
+- **Panel mounting**: parts can sit under the panel (inside an enclosure) with shaft holes cut for pots, encoders, jacks and toggles.
+- **Exports**: STL (watertight, using the [Manifold](https://github.com/elalish/manifold) geometry engine), OpenSCAD source, 3D render PNG, BOM CSV with suggested part numbers, wiring legend SVG, and layout JSON (save/open).
+- **Works on phones**: tap a part to add it, with Parts/Props drawers and touch controls in 3D.
 
----
+## Quick start
 
-## Quick Start
+1. Open the tool. A demo ESP32 synth controller loads, and a short tour explains the basics.
+2. Pick a **Board** shape (or **Import STL…**).
+3. Drag or tap parts from the left panel.
+4. Select a part → **Props** → set its pins' nets. Use **📌 Pinout** to plan where it should sit.
+5. **⚡ Auto-route**, then fix any flags.
+6. **3D** to check it, then **⬇ STL** to download.
 
-1. Download `wire-channel-designer.html`
-2. Open it in any modern browser
-3. Set your board dimensions (top-left panel)
-4. Drag components from the library onto the board
-5. Assign net names to pins (click a pin → type net name)
-6. Click **Auto-Route** to generate wire channels
-7. Export OpenSCAD → open in OpenSCAD → render → export STL → slice → print
+### Printing tips
+- Print a small test first and check your parts' legs fit the **1.0 mm pin holes** (change it under Export → Pin hole Ø).
+- PETG, 0.2 mm layers, flat face down. Channels default to 1.8 mm wide × 1.2 mm deep for 22 AWG.
+- Keep at least 0.8 mm of plastic under a channel. The tool warns you if you don't.
 
----
+## Help the library grow
 
-## Contributing Components
+Every part has a **"Pinout wrong or missing? Report it"** link that opens a pre-filled issue here. See [CONTRIBUTING.md](CONTRIBUTING.md) to fix pinouts or add parts yourself.
 
-The component library lives in a single JavaScript array at the top of the HTML file:
+## Built with
 
-```js
-const COMPONENT_LIBRARY = [
-  {
-    id: 'esp32-devkit-v1',      // unique kebab-case ID
-    cat: 'Microcontrollers',    // category (see list below)
-    name: 'ESP32 DevKit V1',    // display name
-    sub: '30-pin, 28×51.5mm',   // subtitle shown in picker
-    w: 28.0,                    // physical width in mm
-    h: 51.5,                    // physical height in mm
-    pins: 30,                   // total pin count
-    icon: 'MCU',                // 3-letter icon label
-    color: '#1a3a1a',           // card background color
-    holes: [                    // mounting hole positions (mm from top-left)
-      {x: 3.5, y: 3.5},
-      {x: 24.5, y: 3.5},
-      {x: 3.5, y: 48.0},
-      {x: 24.5, y: 48.0}
-    ],
-    pinout: [                   // pin positions and names
-      {n: '3V3', x: 0,    y: 3.8,  s: 'left'},   // s = 'left'|'right'|'top'|'bottom'
-      {n: 'GND', x: 0,    y: 6.4,  s: 'left'},
-      {n: 'D23', x: 28.0, y: 3.8,  s: 'right'},
-      // ...
-    ]
-  },
-  // ...
-];
-```
-
-### Categories
-
-| Category | Icon |
-|---|---|
-| Microcontrollers | MCU |
-| Single Board Computers | SBC |
-| Sensors | SEN |
-| Motors & Relays | MOT |
-| Power Management | PWR |
-| Wireless & RF | RF |
-| Displays & Indicators | DSP |
-| Integrated Circuits | IC |
-| Discrete Semiconductors | SEM |
-| Passives | PAS |
-| Switches & Inputs | SW |
-| Connectors & Hardware | CON |
-
-### Adding Components via JSON (in-tool)
-
-You can also use the **Community Library** button in the tool to import a JSON file of components without editing the HTML:
-
-```json
-[
-  {
-    "id": "my-custom-board",
-    "cat": "Microcontrollers",
-    "name": "My Custom Board",
-    "sub": "Custom, 40×30mm",
-    "w": 40, "h": 30, "pins": 20,
-    "icon": "MCU", "color": "#1a3a1a",
-    "holes": [{"x":3,"y":3},{"x":37,"y":3},{"x":3,"y":27},{"x":37,"y":27}],
-    "pinout": [{"n":"VCC","x":0,"y":5,"s":"left"},{"n":"GND","x":0,"y":10,"s":"left"}]
-  }
-]
-```
-
----
-
-## Hosting Your Own Version
-
-This is a single HTML file — host it anywhere static files are served:
-
-- **GitHub Pages** (recommended): push to a public repo, enable Pages under Settings → Pages
-- **Netlify Drop**: drag the HTML to [netlify.com/drop](https://app.netlify.com/drop)
-- **Vercel**: `vercel --prod wire-channel-designer.html`
-- **Locally**: just open the file in a browser
-
----
+[three.js](https://threejs.org) (3D), [Manifold](https://github.com/elalish/manifold) (watertight booleans), [three-bvh-csg](https://github.com/gkjohnson/three-bvh-csg) (fallback booleans), all MIT/Apache licensed and bundled into the page so it runs offline.
 
 ## License
 
-MIT — do whatever you like, credit appreciated. See [LICENSE](LICENSE).
+MIT. Use it, fork it, sell things you make with it. Credit appreciated.
 
----
-
-## Credits
-
-- Conceived and spec'd by **Kris** / [Cerebral Meltdown Records](https://cerebralm.com)
-- Component library based on community hardware specs
-- Built with vanilla HTML/CSS/JS — no frameworks, no dependencies
+Made by Kris / Cerebral Meltdown Records.
