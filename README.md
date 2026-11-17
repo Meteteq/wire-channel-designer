@@ -29,10 +29,10 @@ Inspired by Johan von Konow's 3DPCB method (Print a Synth, 3DPCBoy).
 
 1. Open the tool. A demo ESP32 synth controller loads, and a short tour explains the basics.
 2. Pick a **Board** shape (or **Import STL…**).
-3. Drag or tap parts from the left panel.
-4. Select a part → **Props** → set its pins' nets. Use **📌 Pinout** to plan where it should sit.
-5. **⚡ Auto-route**, then fix any flags.
-6. **3D** to check it, then **⬇ STL** to download.
+3. Drag or tap parts from the left panel (hover one to see its size and pins). In 3D, drag parts around the board. **Ctrl + drag** orbits, **Ctrl + right-drag** pans, and scroll zooms. On touch screens, drag a part to move it, drag empty space to orbit, and use two fingers to pan and zoom.
+4. Press **⚡ Wire it up**. It connects every part to your microcontroller on sensible pins, then cuts the channels and the holes for every leg.
+5. Fix any flags. For hand-picked pins, select a part → **Props** → **Pins**, or switch to the **Technical** view.
+6. **⬇ STL** to download.
 
 ### Printing tips
 - Print a small test first and check your parts' legs fit the **1.0 mm pin holes** (change it under Export → Pin hole Ø).
