@@ -1,0 +1,1762 @@
+<!--
+  Wire Channel Board Designer
+  ==================================
+  MIT License — https://github.com/meteteq/wire-channel-designer
+  
+  Conceived by Kris / Cerebral Meltdown Records
+  
+  CONTRIBUTING COMPONENTS
+  -----------------------
+  The component library is the array `COMPONENT_LIBRARY` near the top of this file.
+  Each entry follows this shape:
+  
+  {
+    id: 'unique-kebab-id',        // unique ID, no spaces
+    cat: 'Microcontrollers',      // category — see README for full list
+    name: 'Display Name',
+    sub: 'Subtitle shown in picker, e.g. 30-pin, 28×51.5mm',
+    w: 28.0,                      // physical width mm
+    h: 51.5,                      // physical height mm
+    pins: 30,                     // total pin count
+    icon: 'MCU',                  // 3-letter icon
+    color: '#1a3a1a',             // card background hex
+    holes: [{x:3.5, y:3.5}, ...], // mounting hole positions mm from top-left
+    pinout: [                     // pin positions (mm from top-left of component)
+      {n:'3V3', x:0, y:3.8, s:'left'},   // s = 'left'|'right'|'top'|'bottom'
+      {n:'GND', x:0, y:6.4, s:'left'},
+    ]
+  }
+  
+  You can also import community components at runtime via the
+  "Community Library" button — no code editing needed.
+  
+  See README.md for full documentation and contribution guide.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wire Channel Board Designer</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0D0F14;
+  --surface: #141720;
+  --surface2: #1C2030;
+  --surface3: #232840;
+  --border: #2A3045;
+  --border2: #3A4560;
+  --accent: #00C8A0;
+  --accent-dim: rgba(0,200,160,0.15);
+  --accent2: #F5A623;
+  --accent2-dim: rgba(245,166,35,0.15);
+  --danger: #FF5566;
+  --danger-dim: rgba(255,85,102,0.15);
+  --text: #E8ECF4;
+  --text-muted: #7A85A0;
+  --text-dim: #4A5570;
+  --canvas-bg: #0A1A0F;
+  --grid: rgba(0,200,160,0.07);
+  --grid2: rgba(0,200,160,0.14);
+  --channel-top: #00C8A0;
+  --channel-bottom: #F5A623;
+  --channel-both: #9B88FF;
+  --mono: 'JetBrains Mono', monospace;
+  --sans: 'Inter', sans-serif;
+  --sidebar-w: 240px;
+  --props-w: 280px;
+  --topbar-h: 44px;
+  --statusbar-h: 26px;
+}
+
+html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 13px; }
+
+/* ── Layout ── */
+#app { display: flex; flex-direction: column; height: 100%; }
+#topbar { height: var(--topbar-h); background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 0; flex-shrink: 0; z-index: 100; }
+#workspace { flex: 1; display: flex; overflow: hidden; }
+#sidebar { width: var(--sidebar-w); background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
+#canvas-wrap { flex: 1; position: relative; overflow: hidden; background: var(--canvas-bg); cursor: crosshair; }
+#canvas { position: absolute; top: 0; left: 0; }
+#props-panel { width: var(--props-w); background: var(--surface); border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
+#statusbar { height: var(--statusbar-h); background: var(--surface); border-top: 1px solid var(--border); display: flex; align-items: center; padding: 0 12px; gap: 20px; flex-shrink: 0; font-size: 11px; color: var(--text-muted); font-family: var(--mono); }
+
+/* ── Topbar ── */
+.tb-logo { padding: 0 16px; font-weight: 600; font-size: 14px; color: var(--accent); letter-spacing: -0.3px; border-right: 1px solid var(--border); height: 100%; display: flex; align-items: center; white-space: nowrap; }
+.tb-logo span { color: var(--text-muted); font-weight: 300; }
+.tb-sep { width: 1px; height: 24px; background: var(--border); margin: 0 4px; }
+.tb-group { display: flex; align-items: center; padding: 0 8px; gap: 2px; }
+.tb-btn { height: 28px; padding: 0 10px; background: transparent; border: 1px solid transparent; border-radius: 4px; color: var(--text-muted); font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 5px; white-space: nowrap; transition: all 0.12s; font-family: var(--sans); }
+.tb-btn:hover { background: var(--surface2); border-color: var(--border); color: var(--text); }
+.tb-btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+.tb-btn.danger { color: var(--danger); }
+.tb-btn.danger:hover { background: var(--danger-dim); border-color: var(--danger); }
+.tb-label { font-size: 11px; color: var(--text-muted); padding: 0 4px; }
+select.tb-select { height: 28px; padding: 0 8px; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 12px; cursor: pointer; font-family: var(--sans); outline: none; }
+select.tb-select:focus { border-color: var(--accent); }
+input.tb-input { height: 28px; width: 60px; padding: 0 8px; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 12px; font-family: var(--mono); outline: none; text-align: center; }
+input.tb-input:focus { border-color: var(--accent); }
+.tb-spacer { flex: 1; }
+
+/* Layer toggle pills */
+.layer-toggle { display: flex; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+.layer-btn { height: 28px; padding: 0 10px; background: transparent; border: none; color: var(--text-muted); font-size: 11px; cursor: pointer; transition: all 0.12s; font-family: var(--sans); }
+.layer-btn.on-top.active { background: rgba(0,200,160,0.2); color: var(--channel-top); }
+.layer-btn.on-bottom.active { background: rgba(245,166,35,0.2); color: var(--channel-bottom); }
+.layer-btn.on-both.active { background: rgba(155,136,255,0.2); color: var(--channel-both); }
+
+/* ── Sidebar: Component Library ── */
+.panel-title { font-size: 11px; font-weight: 600; color: var(--text-muted); padding: 10px 12px 8px; letter-spacing: 0.5px; text-transform: uppercase; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.search-wrap { padding: 8px 10px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.search-input { width: 100%; height: 28px; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 0 10px; color: var(--text); font-size: 12px; outline: none; font-family: var(--sans); }
+.search-input:focus { border-color: var(--accent); }
+.search-input::placeholder { color: var(--text-dim); }
+#comp-list { flex: 1; overflow-y: auto; padding: 4px; }
+#comp-list::-webkit-scrollbar { width: 4px; }
+#comp-list::-webkit-scrollbar-track { background: transparent; }
+#comp-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+.comp-category { font-size: 10px; font-weight: 600; color: var(--text-dim); padding: 8px 8px 4px; letter-spacing: 0.8px; text-transform: uppercase; }
+.comp-item { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 5px; cursor: grab; transition: background 0.1s; border: 1px solid transparent; user-select: none; }
+.comp-item:hover { background: var(--surface2); border-color: var(--border); }
+.comp-item:active { cursor: grabbing; }
+.comp-icon { width: 32px; height: 32px; border-radius: 3px; background: var(--surface3); border: 1px solid var(--border2); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 9px; font-family: var(--mono); color: var(--accent); font-weight: 500; }
+.comp-info { flex: 1; min-width: 0; }
+.comp-name { font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.comp-sub { font-size: 10px; color: var(--text-muted); font-family: var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.comp-item.dragging { opacity: 0.5; }
+
+/* Custom comp button */
+.add-custom-btn { margin: 8px; padding: 7px; background: var(--surface2); border: 1px dashed var(--border2); border-radius: 5px; color: var(--text-muted); font-size: 12px; cursor: pointer; text-align: center; transition: all 0.12s; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.add-custom-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+
+/* ── Props Panel ── */
+#props-panel .panel-title { display: flex; align-items: center; justify-content: space-between; }
+.props-tabs { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.props-tab { flex: 1; height: 34px; background: transparent; border: none; border-bottom: 2px solid transparent; color: var(--text-muted); font-size: 12px; cursor: pointer; transition: all 0.12s; font-family: var(--sans); }
+.props-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.props-content { flex: 1; overflow-y: auto; padding: 10px; }
+.props-content::-webkit-scrollbar { width: 4px; }
+.props-content::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+.prop-group { margin-bottom: 14px; }
+.prop-group-title { font-size: 11px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; }
+.prop-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 5px; }
+.prop-label { font-size: 11px; color: var(--text-muted); flex-shrink: 0; }
+.prop-val { font-size: 11px; font-family: var(--mono); color: var(--text); }
+.prop-input { height: 26px; background: var(--surface2); border: 1px solid var(--border); border-radius: 3px; color: var(--text); font-size: 11px; padding: 0 7px; outline: none; font-family: var(--mono); width: 90px; text-align: right; }
+.prop-input:focus { border-color: var(--accent); }
+.prop-input.full { width: 100%; text-align: left; }
+.prop-select { height: 26px; background: var(--surface2); border: 1px solid var(--border); border-radius: 3px; color: var(--text); font-size: 11px; padding: 0 6px; outline: none; font-family: var(--sans); width: 110px; }
+.prop-select:focus { border-color: var(--accent); }
+
+/* DRC */
+.drc-item { padding: 7px 8px; border-radius: 4px; margin-bottom: 4px; border: 1px solid transparent; font-size: 11px; cursor: pointer; }
+.drc-item.warn { background: var(--accent2-dim); border-color: rgba(245,166,35,0.3); color: var(--accent2); }
+.drc-item.error { background: var(--danger-dim); border-color: rgba(255,85,102,0.3); color: var(--danger); }
+.drc-item.ok { background: rgba(0,200,160,0.08); border-color: rgba(0,200,160,0.2); color: var(--accent); }
+.drc-icon { margin-right: 5px; }
+
+/* Export buttons */
+.export-btn { width: 100%; padding: 9px 12px; border-radius: 5px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 12px; cursor: pointer; text-align: left; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; transition: all 0.12s; font-family: var(--sans); }
+.export-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+.export-btn .eb-icon { font-size: 16px; }
+.export-btn .eb-info { flex: 1; }
+.export-btn .eb-title { font-weight: 500; font-size: 12px; }
+.export-btn .eb-desc { font-size: 10px; color: var(--text-muted); margin-top: 1px; }
+.export-btn:hover .eb-desc { color: rgba(0,200,160,0.7); }
+
+/* BOM table */
+.bom-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.bom-table th { text-align: left; padding: 4px 6px; color: var(--text-muted); border-bottom: 1px solid var(--border); font-weight: 500; }
+.bom-table td { padding: 4px 6px; border-bottom: 1px solid rgba(42,48,69,0.5); font-family: var(--mono); }
+.bom-table tr:last-child td { border-bottom: none; }
+
+/* Net legend */
+.net-item { display: flex; align-items: center; gap: 7px; padding: 5px 0; border-bottom: 1px solid rgba(42,48,69,0.4); font-size: 11px; }
+.net-swatch { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+.net-label { font-family: var(--mono); flex: 1; }
+.net-count { color: var(--text-muted); font-family: var(--mono); }
+
+/* ── Canvas overlays ── */
+#canvas-wrap canvas { display: block; }
+.canvas-overlay { position: absolute; pointer-events: none; }
+
+/* Zoom indicator */
+#zoom-indicator { position: absolute; bottom: 8px; right: 8px; background: rgba(20,23,32,0.85); border: 1px solid var(--border); border-radius: 4px; padding: 3px 8px; font-size: 11px; font-family: var(--mono); color: var(--text-muted); }
+
+/* Tooltip */
+#tooltip { position: absolute; background: var(--surface3); border: 1px solid var(--border2); border-radius: 4px; padding: 5px 9px; font-size: 11px; pointer-events: none; display: none; z-index: 200; max-width: 180px; }
+#tooltip .tt-name { font-weight: 600; color: var(--text); margin-bottom: 2px; }
+#tooltip .tt-info { color: var(--text-muted); font-family: var(--mono); font-size: 10px; }
+
+/* Context menu */
+#ctx-menu { position: absolute; background: var(--surface2); border: 1px solid var(--border2); border-radius: 6px; padding: 4px; min-width: 160px; z-index: 300; display: none; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+.ctx-item { padding: 7px 10px; border-radius: 3px; cursor: pointer; font-size: 12px; display: flex; align-items: center; gap: 8px; }
+.ctx-item:hover { background: var(--surface3); }
+.ctx-item.sep { border-top: 1px solid var(--border); margin-top: 3px; padding-top: 7px; }
+.ctx-item.red { color: var(--danger); }
+
+/* Modal */
+#modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 500; display: none; align-items: center; justify-content: center; }
+#modal-overlay.show { display: flex; }
+.modal { background: var(--surface); border: 1px solid var(--border2); border-radius: 8px; padding: 20px; min-width: 360px; max-width: 500px; box-shadow: 0 20px 60px rgba(0,0,0,0.6); }
+.modal h3 { font-size: 15px; font-weight: 600; margin-bottom: 14px; color: var(--text); }
+.modal-row { margin-bottom: 10px; }
+.modal-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; display: block; }
+.modal-input { width: 100%; height: 30px; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 12px; padding: 0 10px; outline: none; font-family: var(--mono); }
+.modal-input:focus { border-color: var(--accent); }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+.modal-btn { height: 32px; padding: 0 16px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-size: 12px; cursor: pointer; font-family: var(--sans); }
+.modal-btn.primary { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 600; }
+.modal-btn:hover { opacity: 0.85; }
+
+/* Net assign popup */
+.net-popup { position: absolute; background: var(--surface2); border: 1px solid var(--border2); border-radius: 6px; padding: 8px; z-index: 250; min-width: 140px; box-shadow: 0 6px 20px rgba(0,0,0,0.5); display: none; }
+.net-popup .net-opt { padding: 5px 8px; border-radius: 3px; cursor: pointer; font-size: 11px; font-family: var(--mono); display: flex; align-items: center; gap: 7px; }
+.net-popup .net-opt:hover { background: var(--surface3); }
+.net-popup .net-swatch { width: 8px; height: 8px; border-radius: 1px; flex-shrink: 0; }
+
+/* ── Scrollbars global ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+/* Animations */
+@keyframes route-pulse { 0% { opacity: 0.4; } 50% { opacity: 1; } 100% { opacity: 0.4; } }
+.routing { animation: route-pulse 0.8s ease-in-out 3; }
+
+/* Selection box */
+#sel-box { position: absolute; border: 1px solid var(--accent); background: var(--accent-dim); pointer-events: none; display: none; }
+
+/* Help overlay */
+#help-panel { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--surface2); border: 1px solid var(--border2); border-radius: 8px; padding: 20px 24px; display: none; z-index: 400; min-width: 300px; }
+#help-panel h4 { color: var(--accent); font-size: 13px; margin-bottom: 10px; }
+.help-row { display: flex; justify-content: space-between; gap: 20px; padding: 4px 0; font-size: 11px; border-bottom: 1px solid rgba(42,48,69,0.4); }
+.help-key { font-family: var(--mono); color: var(--accent2); }
+.help-desc { color: var(--text-muted); }
+
+/* Pin labels on canvas (drawn via canvas) */
+/* Snap indicator dot drawn on canvas */
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- TOPBAR -->
+<div id="topbar">
+  <div class="tb-logo">3DPCB <span>Designer</span></div>
+
+  <div class="tb-group">
+    <button class="tb-btn" id="btn-new" title="New board">⬜ New</button>
+    <button class="tb-btn" id="btn-open" title="Open layout">📂 Open</button>
+    <button class="tb-btn" id="btn-save" title="Save layout">💾 Save</button>
+  </div>
+
+  <div class="tb-sep"></div>
+
+  <div class="tb-group">
+    <span class="tb-label">Board</span>
+    <input class="tb-input" id="board-w" value="150" title="Width (mm)"> ×
+    <input class="tb-input" id="board-h" value="100" title="Height (mm)">
+    <span class="tb-label">mm</span>
+  </div>
+
+  <div class="tb-sep"></div>
+
+  <div class="tb-group">
+    <span class="tb-label">Channel</span>
+    <select class="tb-select" id="channel-gauge" title="Wire gauge preset">
+      <option value="2.0">2.0mm (20AWG)</option>
+      <option value="1.8" selected>1.8mm (22AWG)</option>
+      <option value="1.5">1.5mm (24AWG)</option>
+      <option value="1.2">1.2mm (26AWG)</option>
+      <option value="0.9">0.9mm (28AWG)</option>
+      <option value="custom">Custom…</option>
+    </select>
+    <input class="tb-input" id="channel-depth" value="1.2" title="Channel depth (mm)" style="width:52px"> <span class="tb-label">deep</span>
+  </div>
+
+  <div class="tb-sep"></div>
+
+  <div class="tb-group">
+    <span class="tb-label">Layers</span>
+    <div class="layer-toggle">
+      <button class="layer-btn on-top active" id="layer-top" title="Top layer channels">Top</button>
+      <button class="layer-btn on-bottom" id="layer-bottom" title="Bottom layer channels">Bot</button>
+      <button class="layer-btn on-both" id="layer-both" title="Both layers">Both</button>
+    </div>
+  </div>
+
+  <div class="tb-sep"></div>
+
+  <div class="tb-group">
+    <button class="tb-btn active" id="tool-select" title="Select tool (V)">▶ Select</button>
+    <button class="tb-btn" id="tool-wire" title="Draw wire/net (W)">⟵ Wire</button>
+    <button class="tb-btn" id="tool-measure" title="Measure (M)">↔ Measure</button>
+  </div>
+
+  <div class="tb-group">
+    <button class="tb-btn" id="btn-route" title="Auto-route all channels">⚡ Auto-route</button>
+    <button class="tb-btn" id="btn-drc" title="Run design rule check">✓ DRC</button>
+  </div>
+
+  <div class="tb-spacer"></div>
+
+  <div class="tb-group">
+    <button class="tb-btn" id="btn-zoom-out" title="Zoom out (-)">−</button>
+    <button class="tb-btn" id="btn-zoom-fit" title="Fit board (F)" style="width:38px">Fit</button>
+    <button class="tb-btn" id="btn-zoom-in" title="Zoom in (+)">+</button>
+    <button class="tb-btn" id="btn-help" title="Keyboard shortcuts">?</button>
+  </div>
+</div>
+
+<!-- WORKSPACE -->
+<div id="workspace">
+
+  <!-- SIDEBAR: Component Library -->
+  <div id="sidebar">
+    <div class="panel-title">Components</div>
+    <div class="search-wrap">
+      <input class="search-input" id="comp-search" placeholder="Search components…" autocomplete="off">
+    </div>
+    <div id="comp-list"></div>
+    <button class="add-custom-btn" id="btn-add-custom">+ Add custom component</button>
+  </div>
+
+  <!-- CANVAS -->
+  <div id="canvas-wrap">
+    <canvas id="canvas"></canvas>
+    <div id="zoom-indicator">100%</div>
+    <div id="sel-box"></div>
+    <div id="tooltip"><div class="tt-name"></div><div class="tt-info"></div></div>
+    <div id="ctx-menu"></div>
+    <div id="net-popup" class="net-popup"></div>
+    <div id="help-panel">
+      <h4>Keyboard Shortcuts</h4>
+      <div class="help-row"><span class="help-key">V</span><span class="help-desc">Select tool</span></div>
+      <div class="help-row"><span class="help-key">W</span><span class="help-desc">Draw wire/net</span></div>
+      <div class="help-row"><span class="help-key">M</span><span class="help-desc">Measure</span></div>
+      <div class="help-row"><span class="help-key">F</span><span class="help-desc">Fit board to view</span></div>
+      <div class="help-row"><span class="help-key">R</span><span class="help-desc">Rotate selected</span></div>
+      <div class="help-row"><span class="help-key">Del</span><span class="help-desc">Delete selected</span></div>
+      <div class="help-row"><span class="help-key">Ctrl+Z</span><span class="help-desc">Undo</span></div>
+      <div class="help-row"><span class="help-key">Ctrl+Y</span><span class="help-desc">Redo</span></div>
+      <div class="help-row"><span class="help-key">Ctrl+A</span><span class="help-desc">Select all</span></div>
+      <div class="help-row"><span class="help-key">Ctrl+D</span><span class="help-desc">Duplicate</span></div>
+      <div class="help-row"><span class="help-key">Esc</span><span class="help-desc">Deselect / cancel</span></div>
+      <div class="help-row"><span class="help-key">Scroll</span><span class="help-desc">Zoom</span></div>
+      <div class="help-row"><span class="help-key">Middle drag</span><span class="help-desc">Pan</span></div>
+      <div class="help-row"><span class="help-key">?</span><span class="help-desc">Toggle this panel</span></div>
+    </div>
+  </div>
+
+  <!-- PROPERTIES PANEL -->
+  <div id="props-panel">
+    <div class="panel-title">Properties</div>
+    <div class="props-tabs">
+      <button class="props-tab active" data-tab="props">Props</button>
+      <button class="props-tab" data-tab="nets">Nets</button>
+      <button class="props-tab" data-tab="drc">DRC</button>
+      <button class="props-tab" data-tab="export">Export</button>
+    </div>
+    <div class="props-content" id="props-pane">
+      <div id="no-selection" style="color:var(--text-muted);font-size:12px;padding:12px 4px;line-height:1.6">
+        Select a component to view and edit its properties.<br><br>
+        <span style="color:var(--text-dim);font-size:11px">Drag components from the library onto the board, or use Auto-route to generate all channels at once.</span>
+      </div>
+      <div id="selection-props" style="display:none"></div>
+    </div>
+    <div class="props-content" id="nets-pane" style="display:none">
+      <div class="prop-group-title" style="margin-bottom:8px">Signal nets</div>
+      <div id="nets-list"></div>
+      <button class="add-custom-btn" id="btn-add-net" style="margin:0 0 8px 0">+ Add net</button>
+    </div>
+    <div class="props-content" id="drc-pane" style="display:none">
+      <div id="drc-results"><div style="color:var(--text-muted);font-size:12px">Run DRC to check your layout for errors and warnings.</div></div>
+    </div>
+    <div class="props-content" id="export-pane" style="display:none">
+      <div class="prop-group-title" style="margin-bottom:8px">Export</div>
+      <button class="export-btn" id="exp-scad">
+        <span class="eb-icon">📐</span>
+        <div class="eb-info"><div class="eb-title">OpenSCAD (.scad)</div><div class="eb-desc">Parametric, editable source</div></div>
+      </button>
+      <button class="export-btn" id="exp-stl">
+        <span class="eb-icon">🖨</span>
+        <div class="eb-info"><div class="eb-title">STL (.stl)</div><div class="eb-desc">Ready to slice and print</div></div>
+      </button>
+      <button class="export-btn" id="exp-json">
+        <span class="eb-icon">{ }</span>
+        <div class="eb-info"><div class="eb-title">Layout JSON</div><div class="eb-desc">Save / share design</div></div>
+      </button>
+      <button class="export-btn" id="exp-bom">
+        <span class="eb-icon">📋</span>
+        <div class="eb-info"><div class="eb-title">Bill of Materials (.csv)</div><div class="eb-desc">Component list with quantities</div></div>
+      </button>
+      <button class="export-btn" id="exp-wiring">
+        <span class="eb-icon">🗺</span>
+        <div class="eb-info"><div class="eb-title">Wiring Legend (SVG)</div><div class="eb-desc">Channel map with net labels</div></div>
+      </button>
+      <div class="prop-group-title" style="margin:12px 0 8px">Bill of Materials</div>
+      <div id="bom-preview"></div>
+    </div>
+  </div>
+</div>
+
+<!-- STATUSBAR -->
+<div id="statusbar">
+  <span id="sb-coords">x: 0.0  y: 0.0 mm</span>
+  <span id="sb-components">0 components</span>
+  <span id="sb-channels">0 channels</span>
+  <span id="sb-nets">0 nets</span>
+  <span id="sb-drc" style="color:var(--text-dim)">DRC: not run</span>
+  <span style="flex:1"></span>
+  <span id="sb-tool" style="color:var(--accent)">SELECT</span>
+</div>
+
+</div><!-- end #app -->
+
+<!-- Modal -->
+<div id="modal-overlay">
+  <div class="modal" id="modal-box">
+    <h3 id="modal-title">Dialog</h3>
+    <div id="modal-body"></div>
+    <div class="modal-actions" id="modal-actions"></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// COMPONENT LIBRARY
+// ═══════════════════════════════════════════════════════════════
+const COMPONENT_LIBRARY = [
+  {id:'mcu001',cat:'Microcontrollers',name:"ESP32 DevKit V1",sub:"30-Pin Standard, 30-pin, 28.0\u00d751.5mm",w:28.0,h:51.5,pins:30,icon:'MCU',color:'#1a3a1a',holes:[{"x": 3.5, "y": 3.5}, {"x": 24.5, "y": 3.5}, {"x": 3.5, "y": 48.0}, {"x": 24.5, "y": 48.0}],pinout:[{"n": "3V3", "x": 0, "y": 3.7, "s": "left"}, {"n": "GND", "x": 0, "y": 7.4, "s": "left"}, {"n": "EN", "x": 0, "y": 11.0, "s": "left"}, {"n": "VP", "x": 0, "y": 14.7, "s": "left"}, {"n": "VN", "x": 0, "y": 18.4, "s": "left"}, {"n": "D34-35", "x": 0, "y": 22.1, "s": "left"}, {"n": "D32-33", "x": 0, "y": 25.8, "s": "left"}, {"n": "D25-27", "x": 0, "y": 29.4, "s": "left"}, {"n": "D14", "x": 0, "y": 33.1, "s": "left"}, {"n": "D12", "x": 0, "y": 36.8, "s": "left"}, {"n": "D13", "x": 0, "y": 40.5, "s": "left"}, {"n": "VIN", "x": 0, "y": 44.1, "s": "left"}, {"n": "GND", "x": 0, "y": 47.8, "s": "left"}, {"n": "D23", "x": 28.0, "y": 3.7, "s": "right"}, {"n": "D22", "x": 28.0, "y": 7.4, "s": "right"}, {"n": "TX0", "x": 28.0, "y": 11.0, "s": "right"}, {"n": "RX0", "x": 28.0, "y": 14.7, "s": "right"}, {"n": "D21", "x": 28.0, "y": 18.4, "s": "right"}, {"n": "D19", "x": 28.0, "y": 22.1, "s": "right"}, {"n": "D18", "x": 28.0, "y": 25.8, "s": "right"}, {"n": "D5", "x": 28.0, "y": 29.4, "s": "right"}, {"n": "TX2", "x": 28.0, "y": 33.1, "s": "right"}, {"n": "RX2", "x": 28.0, "y": 36.8, "s": "right"}, {"n": "D4", "x": 28.0, "y": 40.5, "s": "right"}, {"n": "D2", "x": 28.0, "y": 44.1, "s": "right"}, {"n": "D15", "x": 28.0, "y": 47.8, "s": "right"}]},
+  {id:'mcu002',cat:'Microcontrollers',name:"ESP32 DevKitC",sub:"38-Pin Extended, 38-pin, 28.0\u00d754.4mm",w:28.0,h:54.4,pins:38,icon:'MCU',color:'#1a3a1a',holes:[{"x": 3.5, "y": 3.5}, {"x": 24.5, "y": 3.5}, {"x": 3.5, "y": 50.9}, {"x": 24.5, "y": 50.9}],pinout:[{"n": "3V3", "x": 0, "y": 3.4, "s": "left"}, {"n": "EN", "x": 0, "y": 6.8, "s": "left"}, {"n": "VP", "x": 0, "y": 10.2, "s": "left"}, {"n": "VN", "x": 0, "y": 13.6, "s": "left"}, {"n": "IO34-35", "x": 0, "y": 17.0, "s": "left"}, {"n": "IO32-33", "x": 0, "y": 20.4, "s": "left"}, {"n": "IO25-27", "x": 0, "y": 23.8, "s": "left"}, {"n": "IO14", "x": 0, "y": 27.2, "s": "left"}, {"n": "IO12", "x": 0, "y": 30.6, "s": "left"}, {"n": "GND", "x": 0, "y": 34.0, "s": "left"}, {"n": "IO13", "x": 0, "y": 37.4, "s": "left"}, {"n": "SD2-3", "x": 0, "y": 40.8, "s": "left"}, {"n": "CMD", "x": 0, "y": 44.2, "s": "left"}, {"n": "5V", "x": 0, "y": 47.6, "s": "left"}, {"n": "GND", "x": 0, "y": 51.0, "s": "left"}, {"n": "IO23", "x": 28.0, "y": 3.4, "s": "right"}, {"n": "IO22", "x": 28.0, "y": 6.8, "s": "right"}, {"n": "TX", "x": 28.0, "y": 10.2, "s": "right"}, {"n": "RX", "x": 28.0, "y": 13.6, "s": "right"}, {"n": "IO21", "x": 28.0, "y": 17.0, "s": "right"}, {"n": "GND", "x": 28.0, "y": 20.4, "s": "right"}, {"n": "IO19-18", "x": 28.0, "y": 23.8, "s": "right"}, {"n": "IO5", "x": 28.0, "y": 27.2, "s": "right"}, {"n": "IO17-16", "x": 28.0, "y": 30.6, "s": "right"}, {"n": "IO4", "x": 28.0, "y": 34.0, "s": "right"}, {"n": "IO0", "x": 28.0, "y": 37.4, "s": "right"}, {"n": "IO2", "x": 28.0, "y": 40.8, "s": "right"}, {"n": "IO15", "x": 28.0, "y": 44.2, "s": "right"}, {"n": "SD1-0", "x": 28.0, "y": 47.6, "s": "right"}, {"n": "CLK", "x": 28.0, "y": 51.0, "s": "right"}]},
+  {id:'mcu003',cat:'Microcontrollers',name:"ESP32-S3 DevKitC-1",sub:"44-Pin Dual USB-C, 44-pin, 25.4\u00d762.7mm",w:25.4,h:62.7,pins:44,icon:'MCU',color:'#1a3a1a',holes:[{"x": 3.5, "y": 3.5}, {"x": 21.9, "y": 3.5}, {"x": 3.5, "y": 59.2}, {"x": 21.9, "y": 59.2}],pinout:[{"n": "3V3", "x": 0, "y": 5.7, "s": "left"}, {"n": "RST", "x": 0, "y": 11.4, "s": "left"}, {"n": "IO4-7", "x": 0, "y": 17.1, "s": "left"}, {"n": "IO15-18", "x": 0, "y": 22.8, "s": "left"}, {"n": "IO8", "x": 0, "y": 28.5, "s": "left"}, {"n": "IO3", "x": 0, "y": 34.2, "s": "left"}, {"n": "IO46", "x": 0, "y": 39.9, "s": "left"}, {"n": "IO9-14", "x": 0, "y": 45.6, "s": "left"}, {"n": "5V", "x": 0, "y": 51.3, "s": "left"}, {"n": "GND", "x": 0, "y": 57.0, "s": "left"}, {"n": "TX", "x": 25.4, "y": 5.7, "s": "right"}, {"n": "RX", "x": 25.4, "y": 11.4, "s": "right"}, {"n": "IO1-2", "x": 25.4, "y": 17.1, "s": "right"}, {"n": "IO42-35", "x": 25.4, "y": 22.8, "s": "right"}, {"n": "IO45", "x": 25.4, "y": 28.5, "s": "right"}, {"n": "IO48", "x": 25.4, "y": 34.2, "s": "right"}, {"n": "IO47", "x": 25.4, "y": 39.9, "s": "right"}, {"n": "IO21", "x": 25.4, "y": 45.6, "s": "right"}, {"n": "IO20", "x": 25.4, "y": 51.3, "s": "right"}, {"n": "IO19", "x": 25.4, "y": 57.0, "s": "right"}]},
+  {id:'mcu004',cat:'Microcontrollers',name:"ESP32-C3 SuperMini",sub:"16-Pin Compact, 16-pin, 18.0\u00d722.5mm",w:18.0,h:22.5,pins:16,icon:'MCU',color:'#1a3a1a',holes:[],pinout:[{"n": "GPIO5-10", "x": 0, "y": 5.6, "s": "left"}, {"n": "GPIO20-21", "x": 0, "y": 11.2, "s": "left"}, {"n": "5V", "x": 0, "y": 16.9, "s": "left"}, {"n": "GND", "x": 18.0, "y": 5.6, "s": "right"}, {"n": "3V3", "x": 18.0, "y": 11.2, "s": "right"}, {"n": "GPIO0-4", "x": 18.0, "y": 16.9, "s": "right"}]},
+  {id:'mcu005',cat:'Microcontrollers',name:"ESP32-C6 DevKitC-1",sub:"32-Pin WiFi 6 / Zigbee / Thread, 32-pin, 25.4\u00d751.8mm",w:25.4,h:51.8,pins:32,icon:'MCU',color:'#1a3a1a',holes:[{"x": 3.5, "y": 3.5}, {"x": 21.9, "y": 3.5}, {"x": 3.5, "y": 48.3}, {"x": 21.9, "y": 48.3}],pinout:[{"n": "3V3", "x": 0, "y": 8.6, "s": "left"}, {"n": "RST", "x": 0, "y": 17.3, "s": "left"}, {"n": "IO0-7", "x": 0, "y": 25.9, "s": "left"}, {"n": "IO15", "x": 0, "y": 34.5, "s": "left"}, {"n": "IO18-23", "x": 0, "y": 43.2, "s": "left"}, {"n": "5V", "x": 25.4, "y": 8.6, "s": "right"}, {"n": "GND", "x": 25.4, "y": 17.3, "s": "right"}, {"n": "TX", "x": 25.4, "y": 25.9, "s": "right"}, {"n": "RX", "x": 25.4, "y": 34.5, "s": "right"}, {"n": "IO8-14", "x": 25.4, "y": 43.2, "s": "right"}]},
+  {id:'mcu006',cat:'Microcontrollers',name:"ESP32-H2 DevKitM-1",sub:"30-Pin Matter / Thread / Zigbee, 30-pin, 25.4\u00d748.2mm",w:25.4,h:48.2,pins:30,icon:'MCU',color:'#1a3a1a',holes:[{"x": 3.5, "y": 3.5}, {"x": 21.9, "y": 3.5}, {"x": 3.5, "y": 44.7}, {"x": 21.9, "y": 44.7}],pinout:[{"n": "3V3", "x": 0, "y": 9.6, "s": "left"}, {"n": "RST", "x": 0, "y": 19.3, "s": "left"}, {"n": "IO0-5", "x": 0, "y": 28.9, "s": "left"}, {"n": "IO8-14", "x": 0, "y": 38.6, "s": "left"}, {"n": "IO22-27", "x": 25.4, "y": 9.6, "s": "right"}, {"n": "5V", "x": 25.4, "y": 19.3, "s": "right"}, {"n": "GND", "x": 25.4, "y": 28.9, "s": "right"}, {"n": "TX", "x": 25.4, "y": 38.6, "s": "right"}, {"n": "RX", "x": 25.4, "y": 48.2, "s": "right"}]},
+  {id:'mcu007',cat:'Microcontrollers',name:"WeMos D1 Mini V4",sub:"16-Pin USB-C, 16-pin, 25.6\u00d734.2mm",w:25.6,h:34.2,pins:16,icon:'MCU',color:'#1a3a1a',holes:[],pinout:[{"n": "RST", "x": 0, "y": 3.8, "s": "left"}, {"n": "A0", "x": 0, "y": 7.6, "s": "left"}, {"n": "D0", "x": 0, "y": 11.4, "s": "left"}, {"n": "D5", "x": 0, "y": 15.2, "s": "left"}, {"n": "D6", "x": 0, "y": 19.0, "s": "left"}, {"n": "D7", "x": 0, "y": 22.8, "s": "left"}, {"n": "D8", "x": 0, "y": 26.6, "s": "left"}, {"n": "3V3", "x": 0, "y": 30.4, "s": "left"}, {"n": "TX", "x": 25.6, "y": 3.8, "s": "right"}, {"n": "RX", "x": 25.6, "y": 7.6, "s": "right"}, {"n": "D1", "x": 25.6, "y": 11.4, "s": "right"}, {"n": "D2", "x": 25.6, "y": 15.2, "s": "right"}, {"n": "D3", "x": 25.6, "y": 19.0, "s": "right"}, {"n": "D4", "x": 25.6, "y": 22.8, "s": "right"}, {"n": "GND", "x": 25.6, "y": 26.6, "s": "right"}, {"n": "5V", "x": 25.6, "y": 30.4, "s": "right"}]},
+  {id:'mcu008',cat:'Microcontrollers',name:"NodeMCU V3 LoLin",sub:"30-Pin Wide, 30-pin, 31.0\u00d758.0mm",w:31.0,h:58.0,pins:30,icon:'MCU',color:'#1a3a1a',holes:[{"x": 3.5, "y": 3.5}, {"x": 27.5, "y": 3.5}, {"x": 3.5, "y": 54.5}, {"x": 27.5, "y": 54.5}],pinout:[{"n": "A0", "x": 0, "y": 5.8, "s": "left"}, {"n": "GND", "x": 0, "y": 11.6, "s": "left"}, {"n": "VU", "x": 0, "y": 17.4, "s": "left"}, {"n": "S3-S0", "x": 0, "y": 23.2, "s": "left"}, {"n": "SK", "x": 0, "y": 29.0, "s": "left"}, {"n": "GND", "x": 0, "y": 34.8, "s": "left"}, {"n": "3V3", "x": 0, "y": 40.6, "s": "left"}, {"n": "EN", "x": 0, "y": 46.4, "s": "left"}, {"n": "RST", "x": 0, "y": 52.2, "s": "left"}, {"n": "GND", "x": 31.0, "y": 5.8, "s": "right"}, {"n": "VIN", "x": 31.0, "y": 11.6, "s": "right"}, {"n": "3V3", "x": 31.0, "y": 17.4, "s": "right"}, {"n": "GND", "x": 31.0, "y": 23.2, "s": "right"}, {"n": "TX", "x": 31.0, "y": 29.0, "s": "right"}, {"n": "RX", "x": 31.0, "y": 34.8, "s": "right"}, {"n": "D8-D0", "x": 31.0, "y": 40.6, "s": "right"}, {"n": "GND", "x": 31.0, "y": 46.4, "s": "right"}, {"n": "3V3", "x": 31.0, "y": 52.2, "s": "right"}]},
+  {id:'mcu009',cat:'Microcontrollers',name:"Raspberry Pi Pico / Pico W",sub:"40-Pin DIP, 40-pin, 21.0\u00d751.0mm",w:21.0,h:51.0,pins:40,icon:'MCU',color:'#1a3a1a',holes:[{"x": 3.5, "y": 3.5}, {"x": 17.5, "y": 3.5}, {"x": 3.5, "y": 47.5}, {"x": 17.5, "y": 47.5}],pinout:[{"n": "GP0-GP22", "x": 0, "y": 10.2, "s": "left"}, {"n": "GND", "x": 0, "y": 20.4, "s": "left"}, {"n": "RUN", "x": 0, "y": 30.6, "s": "left"}, {"n": "GP26-28", "x": 0, "y": 40.8, "s": "left"}, {"n": "ADC_VREF", "x": 21.0, "y": 10.2, "s": "right"}, {"n": "3V3", "x": 21.0, "y": 20.4, "s": "right"}, {"n": "3V3_EN", "x": 21.0, "y": 30.6, "s": "right"}, {"n": "VSYS", "x": 21.0, "y": 40.8, "s": "right"}, {"n": "VBUS", "x": 21.0, "y": 51.0, "s": "right"}]},
+  {id:'mcu010',cat:'Microcontrollers',name:"Raspberry Pi Pico 2 / Pico 2 W",sub:"40-Pin RP2350 Dual-Core, 40-pin, 21.0\u00d751.0mm",w:21.0,h:51.0,pins:40,icon:'MCU',color:'#1a3a1a',holes:[{"x": 3.5, "y": 3.5}, {"x": 17.5, "y": 3.5}, {"x": 3.5, "y": 47.5}, {"x": 17.5, "y": 47.5}],pinout:[{"n": "GP0-GP22", "x": 0, "y": 10.2, "s": "left"}, {"n": "GND", "x": 0, "y": 20.4, "s": "left"}, {"n": "RUN", "x": 0, "y": 30.6, "s": "left"}, {"n": "GP26-28", "x": 0, "y": 40.8, "s": "left"}, {"n": "ADC_VREF", "x": 21.0, "y": 10.2, "s": "right"}, {"n": "3V3", "x": 21.0, "y": 20.4, "s": "right"}, {"n": "3V3_EN", "x": 21.0, "y": 30.6, "s": "right"}, {"n": "VSYS", "x": 21.0, "y": 40.8, "s": "right"}, {"n": "VBUS", "x": 21.0, "y": 51.0, "s": "right"}]},
+  {id:'mcu011',cat:'Microcontrollers',name:"Seeed Studio XIAO (RP2040 / ESP32 / nRF52)",sub:"14-Pin Ultra-Small, 14-pin, 17.8\u00d721.0mm",w:17.8,h:21.0,pins:14,icon:'MCU',color:'#1a3a1a',holes:[],pinout:[{"n": "D0-D10", "x": 0, "y": 7.0, "s": "left"}, {"n": "3V3", "x": 0, "y": 14.0, "s": "left"}, {"n": "GND", "x": 17.8, "y": 7.0, "s": "right"}, {"n": "5V", "x": 17.8, "y": 14.0, "s": "right"}]},
+  {id:'mcu012',cat:'Microcontrollers',name:"Arduino Uno R3 / R4 WiFi",sub:"Standard Shield Footprint, 32-pin, 53.3\u00d768.6mm",w:53.3,h:68.6,pins:32,icon:'MCU',color:'#1a3a1a',holes:[{"x": 3.5, "y": 3.5}, {"x": 49.8, "y": 3.5}, {"x": 3.5, "y": 65.1}, {"x": 49.8, "y": 65.1}],pinout:[{"n": "IOREF", "x": 0, "y": 11.4, "s": "left"}, {"n": "RESET", "x": 0, "y": 22.9, "s": "left"}, {"n": "3.3V", "x": 0, "y": 34.3, "s": "left"}, {"n": "5V", "x": 0, "y": 45.7, "s": "left"}, {"n": "GND", "x": 0, "y": 57.2, "s": "left"}, {"n": "VIN", "x": 53.3, "y": 11.4, "s": "right"}, {"n": "A0-A5", "x": 53.3, "y": 22.9, "s": "right"}, {"n": "D0-D13", "x": 53.3, "y": 34.3, "s": "right"}, {"n": "AREF", "x": 53.3, "y": 45.7, "s": "right"}, {"n": "SDA", "x": 53.3, "y": 57.2, "s": "right"}, {"n": "SCL", "x": 53.3, "y": 68.6, "s": "right"}]},
+  {id:'mcu013',cat:'Microcontrollers',name:"Arduino Nano V3 / Nano Every",sub:"30-Pin DIP, 30-pin, 18.0\u00d745.0mm",w:18.0,h:45.0,pins:30,icon:'MCU',color:'#1a3a1a',holes:[{"x": 3.5, "y": 3.5}, {"x": 14.5, "y": 3.5}, {"x": 3.5, "y": 41.5}, {"x": 14.5, "y": 41.5}],pinout:[{"n": "TX1", "x": 0, "y": 6.4, "s": "left"}, {"n": "RX0", "x": 0, "y": 12.9, "s": "left"}, {"n": "RST", "x": 0, "y": 19.3, "s": "left"}, {"n": "GND", "x": 0, "y": 25.7, "s": "left"}, {"n": "D2-D13", "x": 0, "y": 32.1, "s": "left"}, {"n": "3V3", "x": 0, "y": 38.6, "s": "left"}, {"n": "REF", "x": 18.0, "y": 6.4, "s": "right"}, {"n": "A0-A7", "x": 18.0, "y": 12.9, "s": "right"}, {"n": "5V", "x": 18.0, "y": 19.3, "s": "right"}, {"n": "RST", "x": 18.0, "y": 25.7, "s": "right"}, {"n": "GND", "x": 18.0, "y": 32.1, "s": "right"}, {"n": "VIN", "x": 18.0, "y": 38.6, "s": "right"}]},
+  {id:'mcu014',cat:'Microcontrollers',name:"Arduino Pro Micro (ATmega32U4)",sub:"24-Pin Native USB, 24-pin, 18.0\u00d733.0mm",w:18.0,h:33.0,pins:24,icon:'MCU',color:'#1a3a1a',holes:[],pinout:[{"n": "TXO", "x": 0, "y": 4.1, "s": "left"}, {"n": "RXI", "x": 0, "y": 8.2, "s": "left"}, {"n": "GND", "x": 0, "y": 12.4, "s": "left"}, {"n": "GND", "x": 0, "y": 16.5, "s": "left"}, {"n": "D2-D9", "x": 0, "y": 20.6, "s": "left"}, {"n": "RAW", "x": 0, "y": 24.8, "s": "left"}, {"n": "GND", "x": 0, "y": 28.9, "s": "left"}, {"n": "RST", "x": 18.0, "y": 4.1, "s": "right"}, {"n": "VCC", "x": 18.0, "y": 8.2, "s": "right"}, {"n": "A3-A0", "x": 18.0, "y": 12.4, "s": "right"}, {"n": "D15", "x": 18.0, "y": 16.5, "s": "right"}, {"n": "D14", "x": 18.0, "y": 20.6, "s": "right"}, {"n": "D16", "x": 18.0, "y": 24.8, "s": "right"}, {"n": "D10", "x": 18.0, "y": 28.9, "s": "right"}]},
+  {id:'mcu015',cat:'Microcontrollers',name:"Arduino Mega 2560 R3",sub:"Extended 86-Pin Footprint, 86-pin, 53.3\u00d7101.6mm",w:53.3,h:101.6,pins:86,icon:'MCU',color:'#1a3a1a',holes:[{"x": 3.5, "y": 3.5}, {"x": 49.8, "y": 3.5}, {"x": 3.5, "y": 98.1}, {"x": 49.8, "y": 98.1}],pinout:[{"n": "Power", "x": 0, "y": 33.9, "s": "left"}, {"n": "A0-A15", "x": 0, "y": 67.7, "s": "left"}, {"n": "PWM D0-D13", "x": 53.3, "y": 33.9, "s": "right"}, {"n": "Comm D14-D21", "x": 53.3, "y": 67.7, "s": "right"}, {"n": "Dual-Row D22-D53", "x": 53.3, "y": 101.6, "s": "right"}]},
+  {id:'mcu016',cat:'Microcontrollers',name:"STM32F103C8T6 Bluepill",sub:"40-Pin ARM Cortex-M3, 40-pin, 22.8\u00d753.3mm",w:22.8,h:53.3,pins:40,icon:'MCU',color:'#1a3a1a',holes:[],pinout:[{"n": "VBAT", "x": 0, "y": 10.7, "s": "left"}, {"n": "PC13-15", "x": 0, "y": 21.3, "s": "left"}, {"n": "PA0-15", "x": 0, "y": 32.0, "s": "left"}, {"n": "PB0-15", "x": 0, "y": 42.6, "s": "left"}, {"n": "NRST", "x": 22.8, "y": 10.7, "s": "right"}, {"n": "3V3", "x": 22.8, "y": 21.3, "s": "right"}, {"n": "GND", "x": 22.8, "y": 32.0, "s": "right"}, {"n": "5V", "x": 22.8, "y": 42.6, "s": "right"}]},
+  {id:'mcu017',cat:'Microcontrollers',name:"STM32F411CEU6 Blackpill",sub:"40-Pin ARM Cortex-M4F, 40-pin, 20.8\u00d752.8mm",w:20.8,h:52.8,pins:40,icon:'MCU',color:'#1a3a1a',holes:[],pinout:[{"n": "VBAT", "x": 0, "y": 10.6, "s": "left"}, {"n": "PC13-15", "x": 0, "y": 21.1, "s": "left"}, {"n": "PA0-15", "x": 0, "y": 31.7, "s": "left"}, {"n": "PB0-15", "x": 0, "y": 42.2, "s": "left"}, {"n": "NRST", "x": 20.8, "y": 10.6, "s": "right"}, {"n": "3V3", "x": 20.8, "y": 21.1, "s": "right"}, {"n": "GND", "x": 20.8, "y": 31.7, "s": "right"}, {"n": "5V", "x": 20.8, "y": 42.2, "s": "right"}]},
+  {id:'mcu018',cat:'Microcontrollers',name:"Teensy 4.1",sub:"48-Pin 600MHz ARM Cortex-M7, 48-pin, 17.8\u00d761.0mm",w:17.8,h:61.0,pins:48,icon:'MCU',color:'#1a3a1a',holes:[],pinout:[{"n": "GND", "x": 0, "y": 12.2, "s": "left"}, {"n": "D0-D12", "x": 0, "y": 24.4, "s": "left"}, {"n": "3V3", "x": 0, "y": 36.6, "s": "left"}, {"n": "D24-D32", "x": 0, "y": 48.8, "s": "left"}, {"n": "D41-D33", "x": 17.8, "y": 12.2, "s": "right"}, {"n": "D23-D13", "x": 17.8, "y": 24.4, "s": "right"}, {"n": "GND", "x": 17.8, "y": 36.6, "s": "right"}, {"n": "VIN", "x": 17.8, "y": 48.8, "s": "right"}, {"n": "VUSB", "x": 17.8, "y": 61.0, "s": "right"}]},
+  {id:'sbc001',cat:'Single Board Computers',name:"Raspberry Pi Zero 2 W",sub:"40-Pin Quad-Core Compact, 40-pin, 30.0\u00d765.0mm",w:30.0,h:65.0,pins:40,icon:'SBC',color:'#1a1a3a',holes:[{"x": 3.5, "y": 3.5}, {"x": 26.5, "y": 3.5}, {"x": 3.5, "y": 61.5}, {"x": 26.5, "y": 61.5}],pinout:[{"n": "2x20 40-pin GPIO (3V3", "x": 0, "y": 13.0, "s": "left"}, {"n": "5V", "x": 0, "y": 26.0, "s": "left"}, {"n": "GND", "x": 0, "y": 39.0, "s": "left"}, {"n": "I2C", "x": 0, "y": 52.0, "s": "left"}, {"n": "SPI", "x": 30.0, "y": 13.0, "s": "right"}, {"n": "UART", "x": 30.0, "y": 26.0, "s": "right"}, {"n": "PWM", "x": 30.0, "y": 39.0, "s": "right"}, {"n": "GPIO2-27)", "x": 30.0, "y": 52.0, "s": "right"}]},
+  {id:'sbc002',cat:'Single Board Computers',name:"Raspberry Pi 4B / 5",sub:"40-Pin Full Desktop SBC, 40-pin, 56.0\u00d785.0mm",w:56.0,h:85.0,pins:40,icon:'SBC',color:'#1a1a3a',holes:[{"x": 3.5, "y": 3.5}, {"x": 52.5, "y": 3.5}, {"x": 3.5, "y": 81.5}, {"x": 52.5, "y": 81.5}],pinout:[{"n": "2x20 40-pin GPIO + PoE 4-pin header", "x": 56.0, "y": 42.5, "s": "right"}]},
+  {id:'sbc003',cat:'Single Board Computers',name:"Jetson Orin Nano Dev Kit",sub:"40-Pin Edge AI Carrier, 40-pin, 79.0\u00d7100.0mm",w:79.0,h:100.0,pins:40,icon:'SBC',color:'#1a1a3a',holes:[{"x": 3.5, "y": 3.5}, {"x": 75.5, "y": 3.5}, {"x": 3.5, "y": 96.5}, {"x": 75.5, "y": 96.5}],pinout:[{"n": "2x20 40-pin GPIO + 12-pin Button Header + CAN Header", "x": 79.0, "y": 50.0, "s": "right"}]},
+  {id:'sbc004',cat:'Single Board Computers',name:"BeagleBone Black",sub:"92-Pin Dual Expansion Header, 92-pin, 54.6\u00d786.4mm",w:54.6,h:86.4,pins:92,icon:'SBC',color:'#1a1a3a',holes:[{"x": 3.5, "y": 3.5}, {"x": 51.1, "y": 3.5}, {"x": 3.5, "y": 82.9}, {"x": 51.1, "y": 82.9}],pinout:[{"n": "P8 (2x23) & P9 (2x23) Expansion Headers", "x": 54.6, "y": 43.2, "s": "right"}]},
+  {id:'sen001',cat:'Sensors',name:"BME280 Temp / Humidity / Pressure",sub:"4-Pin I2C / 6-Pin SPI Breakout, 4-pin, 11.5\u00d715.0mm",w:11.5,h:15.0,pins:4,icon:'SEN',color:'#3a1a1a',holes:[],pinout:[{"n": "VCC", "x": 0, "y": 5.0, "s": "left"}, {"n": "GND", "x": 0, "y": 10.0, "s": "left"}, {"n": "SCL", "x": 11.5, "y": 5.0, "s": "right"}, {"n": "SDA (or CSB", "x": 11.5, "y": 10.0, "s": "right"}, {"n": "SDO)", "x": 11.5, "y": 15.0, "s": "right"}]},
+  {id:'sen002',cat:'Sensors',name:"DHT22 (AM2302) Digital Temp & Humidity",sub:"3-Pin / 4-Pin Housing, 4-pin, 15.1\u00d725.0mm",w:15.1,h:25.0,pins:4,icon:'SEN',color:'#3a1a1a',holes:[],pinout:[{"n": "1:VCC", "x": 0, "y": 8.3, "s": "left"}, {"n": "2:DATA", "x": 0, "y": 16.7, "s": "left"}, {"n": "3:NC", "x": 15.1, "y": 8.3, "s": "right"}, {"n": "4:GND", "x": 15.1, "y": 16.7, "s": "right"}]},
+  {id:'sen003',cat:'Sensors',name:"DS18B20 Waterproof / TO-92 Temp Probe",sub:"3-Pin 1-Wire Digital, 3-pin, 4.5\u00d75.2mm",w:4.5,h:5.2,pins:3,icon:'SEN',color:'#3a1a1a',holes:[],pinout:[{"n": "1:GND", "x": 0, "y": 2.6, "s": "left"}, {"n": "2:DQ (Data)", "x": 4.5, "y": 2.6, "s": "right"}, {"n": "3:VDD", "x": 4.5, "y": 5.2, "s": "right"}]},
+  {id:'sen004',cat:'Sensors',name:"Capacitive Soil Moisture Sensor v1.2",sub:"3-Pin Analog Probe, 3-pin, 23.0\u00d798.0mm",w:23.0,h:98.0,pins:3,icon:'SEN',color:'#3a1a1a',holes:[],pinout:[{"n": "GND", "x": 0, "y": 49.0, "s": "left"}, {"n": "VCC", "x": 23.0, "y": 49.0, "s": "right"}, {"n": "AOUT", "x": 23.0, "y": 98.0, "s": "right"}]},
+  {id:'sen005',cat:'Sensors',name:"MPU6050 6-Axis Accel + Gyro (GY-521)",sub:"8-Pin I2C Module, 8-pin, 15.6\u00d721.2mm",w:15.6,h:21.2,pins:8,icon:'SEN',color:'#3a1a1a',holes:[{"x": 7.8, "y": 3.5}, {"x": 7.8, "y": 17.7}],pinout:[{"n": "VCC", "x": 0, "y": 4.2, "s": "left"}, {"n": "GND", "x": 0, "y": 8.5, "s": "left"}, {"n": "SCL", "x": 0, "y": 12.7, "s": "left"}, {"n": "SDA", "x": 0, "y": 17.0, "s": "left"}, {"n": "XDA", "x": 15.6, "y": 4.2, "s": "right"}, {"n": "XCL", "x": 15.6, "y": 8.5, "s": "right"}, {"n": "AD0", "x": 15.6, "y": 12.7, "s": "right"}, {"n": "INT", "x": 15.6, "y": 17.0, "s": "right"}]},
+  {id:'sen006',cat:'Sensors',name:"BNO055 / ICM-20948 9-Axis Absolute IMU",sub:"6-Pin / 8-Pin Fusion IMU, 6-pin, 20.0\u00d727.0mm",w:20.0,h:27.0,pins:6,icon:'SEN',color:'#3a1a1a',holes:[{"x": 10.0, "y": 3.5}, {"x": 10.0, "y": 23.5}],pinout:[{"n": "VIN", "x": 0, "y": 6.8, "s": "left"}, {"n": "3VO", "x": 0, "y": 13.5, "s": "left"}, {"n": "GND", "x": 0, "y": 20.2, "s": "left"}, {"n": "SDA", "x": 20.0, "y": 6.8, "s": "right"}, {"n": "SCL", "x": 20.0, "y": 13.5, "s": "right"}, {"n": "RST", "x": 20.0, "y": 20.2, "s": "right"}]},
+  {id:'sen007',cat:'Sensors',name:"HC-SR501 PIR Motion Detector Module",sub:"3-Pin Digital Pyroelectric, 3-pin, 24.0\u00d732.0mm",w:24.0,h:32.0,pins:3,icon:'SEN',color:'#3a1a1a',holes:[{"x": 12.0, "y": 3.5}, {"x": 12.0, "y": 28.5}],pinout:[{"n": "VCC", "x": 0, "y": 16.0, "s": "left"}, {"n": "OUT", "x": 24.0, "y": 16.0, "s": "right"}, {"n": "GND", "x": 24.0, "y": 32.0, "s": "right"}]},
+  {id:'sen008',cat:'Sensors',name:"RCWL-0516 Doppler Radar Motion Sensor",sub:"5-Pin Microwave Radar, 5-pin, 17.3\u00d735.9mm",w:17.3,h:35.9,pins:5,icon:'SEN',color:'#3a1a1a',holes:[],pinout:[{"n": "3V3", "x": 0, "y": 12.0, "s": "left"}, {"n": "GND", "x": 0, "y": 23.9, "s": "left"}, {"n": "OUT", "x": 17.3, "y": 12.0, "s": "right"}, {"n": "VIN", "x": 17.3, "y": 23.9, "s": "right"}, {"n": "CDS", "x": 17.3, "y": 35.9, "s": "right"}]},
+  {id:'sen009',cat:'Sensors',name:"HC-SR04 Ultrasonic Distance Sensor",sub:"4-Pin Trig/Echo Sonar, 4-pin, 20.0\u00d745.0mm",w:20.0,h:45.0,pins:4,icon:'SEN',color:'#3a1a1a',holes:[{"x": 3.5, "y": 3.5}, {"x": 16.5, "y": 3.5}, {"x": 3.5, "y": 41.5}, {"x": 16.5, "y": 41.5}],pinout:[{"n": "VCC", "x": 0, "y": 15.0, "s": "left"}, {"n": "Trig", "x": 0, "y": 30.0, "s": "left"}, {"n": "Echo", "x": 20.0, "y": 15.0, "s": "right"}, {"n": "GND", "x": 20.0, "y": 30.0, "s": "right"}]},
+  {id:'sen010',cat:'Sensors',name:"VL53L0X / VL53L1X Time-of-Flight Laser LiDAR",sub:"6-Pin I2C Module, 6-pin, 13.0\u00d718.0mm",w:13.0,h:18.0,pins:6,icon:'SEN',color:'#3a1a1a',holes:[{"x": 6.5, "y": 3.5}, {"x": 6.5, "y": 14.5}],pinout:[{"n": "VIN", "x": 0, "y": 4.5, "s": "left"}, {"n": "GND", "x": 0, "y": 9.0, "s": "left"}, {"n": "SCL", "x": 0, "y": 13.5, "s": "left"}, {"n": "SDA", "x": 13.0, "y": 4.5, "s": "right"}, {"n": "GPIO1", "x": 13.0, "y": 9.0, "s": "right"}, {"n": "XSHUT", "x": 13.0, "y": 13.5, "s": "right"}]},
+  {id:'sen011',cat:'Sensors',name:"BH1750 Digital Ambient Light Sensor (Lux)",sub:"5-Pin I2C Module, 5-pin, 13.9\u00d718.5mm",w:13.9,h:18.5,pins:5,icon:'SEN',color:'#3a1a1a',holes:[],pinout:[{"n": "VCC", "x": 0, "y": 6.2, "s": "left"}, {"n": "GND", "x": 0, "y": 12.3, "s": "left"}, {"n": "SCL", "x": 13.9, "y": 6.2, "s": "right"}, {"n": "SDA", "x": 13.9, "y": 12.3, "s": "right"}, {"n": "ADDR", "x": 13.9, "y": 18.5, "s": "right"}]},
+  {id:'sen012',cat:'Sensors',name:"GL5528 Photoresistor (LDR) 5mm",sub:"2-Pin Radial, 2-pin, 5.0\u00d75.0mm",w:5.0,h:5.0,pins:2,icon:'SEN',color:'#3a1a1a',holes:[],pinout:[{"n": "Non-Polarized (1", "x": 0, "y": 2.5, "s": "left"}, {"n": "2)", "x": 5.0, "y": 2.5, "s": "right"}]},
+  {id:'sen013',cat:'Sensors',name:"MQ-2 / MQ-135 Gas & Smoke Sensor Module",sub:"4-Pin Analog + Digital, 4-pin, 20.0\u00d732.0mm",w:20.0,h:32.0,pins:4,icon:'SEN',color:'#3a1a1a',holes:[{"x": 10.0, "y": 3.5}, {"x": 10.0, "y": 28.5}],pinout:[{"n": "VCC", "x": 0, "y": 10.7, "s": "left"}, {"n": "GND", "x": 0, "y": 21.3, "s": "left"}, {"n": "DOUT", "x": 20.0, "y": 10.7, "s": "right"}, {"n": "AOUT", "x": 20.0, "y": 21.3, "s": "right"}]},
+  {id:'sen014',cat:'Sensors',name:"SGP30 / ENS160 TVOC & eCO2 Air Quality",sub:"4-Pin I2C Module, 4-pin, 13.0\u00d718.0mm",w:13.0,h:18.0,pins:4,icon:'SEN',color:'#3a1a1a',holes:[{"x": 6.5, "y": 3.5}, {"x": 6.5, "y": 14.5}],pinout:[{"n": "VIN", "x": 0, "y": 6.0, "s": "left"}, {"n": "GND", "x": 0, "y": 12.0, "s": "left"}, {"n": "SCL", "x": 13.0, "y": 6.0, "s": "right"}, {"n": "SDA", "x": 13.0, "y": 12.0, "s": "right"}]},
+  {id:'sen015',cat:'Sensors',name:"ACS712 Hall-Effect Current Sensor (5A/20A/30A)",sub:"3-Pin Logic + 2 Screw Terminals, 5-pin, 13.0\u00d731.0mm",w:13.0,h:31.0,pins:5,icon:'SEN',color:'#3a1a1a',holes:[{"x": 6.5, "y": 3.5}, {"x": 6.5, "y": 27.5}],pinout:[{"n": "VCC", "x": 0, "y": 10.3, "s": "left"}, {"n": "OUT", "x": 0, "y": 20.7, "s": "left"}, {"n": "GND + IP+", "x": 13.0, "y": 10.3, "s": "right"}, {"n": "IP-", "x": 13.0, "y": 20.7, "s": "right"}]},
+  {id:'sen016',cat:'Sensors',name:"INA219 High-Side DC Current & Power Monitor",sub:"6-Pin I2C + Screw Terminal, 8-pin, 22.0\u00d725.0mm",w:22.0,h:25.0,pins:8,icon:'SEN',color:'#3a1a1a',holes:[{"x": 11.0, "y": 3.5}, {"x": 11.0, "y": 21.5}],pinout:[{"n": "VCC", "x": 0, "y": 6.2, "s": "left"}, {"n": "GND", "x": 0, "y": 12.5, "s": "left"}, {"n": "SCL", "x": 0, "y": 18.8, "s": "left"}, {"n": "SDA", "x": 22.0, "y": 6.2, "s": "right"}, {"n": "VIN-", "x": 22.0, "y": 12.5, "s": "right"}, {"n": "VIN+", "x": 22.0, "y": 18.8, "s": "right"}]},
+  {id:'sen017',cat:'Sensors',name:"A3144 Hall-Effect Magnetic Switch",sub:"3-Pin TO-92UA, 3-pin, 4.1\u00d74.1mm",w:4.1,h:4.1,pins:3,icon:'SEN',color:'#3a1a1a',holes:[],pinout:[{"n": "1:VCC", "x": 0, "y": 2.0, "s": "left"}, {"n": "2:GND", "x": 4.1, "y": 2.0, "s": "right"}, {"n": "3:OUT", "x": 4.1, "y": 4.1, "s": "right"}]},
+  {id:'sen018',cat:'Sensors',name:"HX711 24-Bit Load Cell Weight ADC Module",sub:"10-Pin Bridge Amplifier, 10-pin, 21.0\u00d734.0mm",w:21.0,h:34.0,pins:10,icon:'SEN',color:'#3a1a1a',holes:[{"x": 10.5, "y": 3.5}, {"x": 10.5, "y": 30.5}],pinout:[{"n": "E+", "x": 0, "y": 6.8, "s": "left"}, {"n": "E-", "x": 0, "y": 13.6, "s": "left"}, {"n": "A-", "x": 0, "y": 20.4, "s": "left"}, {"n": "A+", "x": 0, "y": 27.2, "s": "left"}, {"n": "B-", "x": 21.0, "y": 6.8, "s": "right"}, {"n": "B+ | GND", "x": 21.0, "y": 13.6, "s": "right"}, {"n": "DT", "x": 21.0, "y": 20.4, "s": "right"}, {"n": "SCK", "x": 21.0, "y": 27.2, "s": "right"}, {"n": "VCC", "x": 21.0, "y": 34.0, "s": "right"}]},
+  {id:'sen019',cat:'Sensors',name:"MAX30102 Pulse Oximeter & Heart Rate Sensor",sub:"5-Pin I2C Optical, 5-pin, 14.0\u00d719.0mm",w:14.0,h:19.0,pins:5,icon:'SEN',color:'#3a1a1a',holes:[{"x": 7.0, "y": 3.5}, {"x": 7.0, "y": 15.5}],pinout:[{"n": "VIN", "x": 0, "y": 6.3, "s": "left"}, {"n": "SCL", "x": 0, "y": 12.7, "s": "left"}, {"n": "SDA", "x": 14.0, "y": 6.3, "s": "right"}, {"n": "INT", "x": 14.0, "y": 12.7, "s": "right"}, {"n": "GND", "x": 14.0, "y": 19.0, "s": "right"}]},
+  {id:'act001',cat:'Motors & Relays',name:"5V / 12V 1-Channel Opto-Isolated Relay Module",sub:"3-Pin Control + 3 Screw Terminals, 6-pin, 26.0\u00d750.0mm",w:26.0,h:50.0,pins:6,icon:'MOT',color:'#3a2a0a',holes:[{"x": 3.5, "y": 3.5}, {"x": 22.5, "y": 3.5}, {"x": 3.5, "y": 46.5}, {"x": 22.5, "y": 46.5}],pinout:[{"n": "DC+", "x": 0, "y": 16.7, "s": "left"}, {"n": "DC-", "x": 0, "y": 33.3, "s": "left"}, {"n": "IN | NO", "x": 26.0, "y": 16.7, "s": "right"}, {"n": "COM", "x": 26.0, "y": 33.3, "s": "right"}, {"n": "NC", "x": 26.0, "y": 50.0, "s": "right"}]},
+  {id:'act002',cat:'Motors & Relays',name:"G3MB-202P Solid State Relay (SSR) 2A",sub:"4-Pin Through-Hole, 4-pin, 5.5\u00d724.5mm",w:5.5,h:24.5,pins:4,icon:'MOT',color:'#3a2a0a',holes:[],pinout:[{"n": "1:Load1", "x": 0, "y": 8.2, "s": "left"}, {"n": "2:Load2", "x": 0, "y": 16.3, "s": "left"}, {"n": "3:DC+", "x": 5.5, "y": 8.2, "s": "right"}, {"n": "4:DC-", "x": 5.5, "y": 16.3, "s": "right"}]},
+  {id:'act003',cat:'Motors & Relays',name:"TB6612FNG Dual DC Motor Driver Breakout",sub:"16-Pin High-Efficiency MOSFET, 16-pin, 20.3\u00d720.3mm",w:20.3,h:20.3,pins:16,icon:'MOT',color:'#3a2a0a',holes:[{"x": 10.15, "y": 3.5}, {"x": 10.15, "y": 16.8}],pinout:[{"n": "VM", "x": 0, "y": 2.5, "s": "left"}, {"n": "VCC", "x": 0, "y": 5.1, "s": "left"}, {"n": "GND", "x": 0, "y": 7.6, "s": "left"}, {"n": "A01", "x": 0, "y": 10.2, "s": "left"}, {"n": "A02", "x": 0, "y": 12.7, "s": "left"}, {"n": "B02", "x": 0, "y": 15.2, "s": "left"}, {"n": "B01", "x": 0, "y": 17.8, "s": "left"}, {"n": "GND | PWMA", "x": 20.3, "y": 2.5, "s": "right"}, {"n": "AIN2", "x": 20.3, "y": 5.1, "s": "right"}, {"n": "AIN1", "x": 20.3, "y": 7.6, "s": "right"}, {"n": "STBY", "x": 20.3, "y": 10.2, "s": "right"}, {"n": "BIN1", "x": 20.3, "y": 12.7, "s": "right"}, {"n": "BIN2", "x": 20.3, "y": 15.2, "s": "right"}, {"n": "PWMB", "x": 20.3, "y": 17.8, "s": "right"}, {"n": "GND", "x": 20.3, "y": 20.3, "s": "right"}]},
+  {id:'act004',cat:'Motors & Relays',name:"DRV8833 Dual H-Bridge Motor Driver",sub:"12-Pin Low-Voltage Driver, 12-pin, 18.0\u00d721.0mm",w:18.0,h:21.0,pins:12,icon:'MOT',color:'#3a2a0a',holes:[],pinout:[{"n": "EEP", "x": 0, "y": 3.5, "s": "left"}, {"n": "OUT1", "x": 0, "y": 7.0, "s": "left"}, {"n": "OUT2", "x": 0, "y": 10.5, "s": "left"}, {"n": "OUT3", "x": 0, "y": 14.0, "s": "left"}, {"n": "OUT4", "x": 0, "y": 17.5, "s": "left"}, {"n": "GND | ULT", "x": 18.0, "y": 3.5, "s": "right"}, {"n": "IN1", "x": 18.0, "y": 7.0, "s": "right"}, {"n": "IN2", "x": 18.0, "y": 10.5, "s": "right"}, {"n": "IN3", "x": 18.0, "y": 14.0, "s": "right"}, {"n": "IN4", "x": 18.0, "y": 17.5, "s": "right"}, {"n": "VCC", "x": 18.0, "y": 21.0, "s": "right"}]},
+  {id:'act005',cat:'Motors & Relays',name:"L298N Dual H-Bridge Motor & Stepper Module",sub:"Screw Terminals + 6-Pin Logic, 11-pin, 43.0\u00d743.0mm",w:43.0,h:43.0,pins:11,icon:'MOT',color:'#3a2a0a',holes:[{"x": 3.5, "y": 3.5}, {"x": 39.5, "y": 3.5}, {"x": 3.5, "y": 39.5}, {"x": 39.5, "y": 39.5}],pinout:[{"n": "OUT1-4", "x": 0, "y": 10.8, "s": "left"}, {"n": "12V", "x": 0, "y": 21.5, "s": "left"}, {"n": "GND", "x": 0, "y": 32.2, "s": "left"}, {"n": "5V", "x": 43.0, "y": 10.8, "s": "right"}, {"n": "ENA", "x": 43.0, "y": 21.5, "s": "right"}, {"n": "IN1-4", "x": 43.0, "y": 32.2, "s": "right"}, {"n": "ENB", "x": 43.0, "y": 43.0, "s": "right"}]},
+  {id:'act006',cat:'Motors & Relays',name:"A4988 / DRV8825 / TMC2209 StepStick Driver",sub:"16-Pin StepStick Standard, 16-pin, 15.24\u00d720.32mm",w:15.24,h:20.32,pins:16,icon:'MOT',color:'#3a2a0a',holes:[],pinout:[{"n": "EN", "x": 0, "y": 2.5, "s": "left"}, {"n": "MS1", "x": 0, "y": 5.1, "s": "left"}, {"n": "MS2", "x": 0, "y": 7.6, "s": "left"}, {"n": "MS3", "x": 0, "y": 10.2, "s": "left"}, {"n": "RST", "x": 0, "y": 12.7, "s": "left"}, {"n": "SLP", "x": 0, "y": 15.2, "s": "left"}, {"n": "STEP", "x": 0, "y": 17.8, "s": "left"}, {"n": "DIR | VMOT", "x": 15.24, "y": 2.5, "s": "right"}, {"n": "GND", "x": 15.24, "y": 5.1, "s": "right"}, {"n": "2B", "x": 15.24, "y": 7.6, "s": "right"}, {"n": "2A", "x": 15.24, "y": 10.2, "s": "right"}, {"n": "1A", "x": 15.24, "y": 12.7, "s": "right"}, {"n": "1B", "x": 15.24, "y": 15.2, "s": "right"}, {"n": "VDD", "x": 15.24, "y": 17.8, "s": "right"}, {"n": "GND", "x": 15.24, "y": 20.3, "s": "right"}]},
+  {id:'act007',cat:'Motors & Relays',name:"ULN2003 Stepper Driver Board (for 28BYJ-48)",sub:"4-Pin Input + JST-XH 5-Pin, 11-pin, 32.0\u00d735.0mm",w:32.0,h:35.0,pins:11,icon:'MOT',color:'#3a2a0a',holes:[{"x": 3.5, "y": 3.5}, {"x": 28.5, "y": 3.5}, {"x": 3.5, "y": 31.5}, {"x": 28.5, "y": 31.5}],pinout:[{"n": "IN1-IN4", "x": 0, "y": 17.5, "s": "left"}, {"n": "+", "x": 32.0, "y": 17.5, "s": "right"}, {"n": "- | 5-Pin Motor Socket", "x": 32.0, "y": 35.0, "s": "right"}]},
+  {id:'act008',cat:'Motors & Relays',name:"PCA9685 16-Channel 12-Bit PWM Servo Driver",sub:"6-Pin I2C + 16x3 Servo Headers, 60-pin, 25.4\u00d762.5mm",w:25.4,h:62.5,pins:60,icon:'MOT',color:'#3a2a0a',holes:[{"x": 3.5, "y": 3.5}, {"x": 21.9, "y": 3.5}, {"x": 3.5, "y": 59.0}, {"x": 21.9, "y": 59.0}],pinout:[{"n": "GND", "x": 0, "y": 12.5, "s": "left"}, {"n": "OE", "x": 0, "y": 25.0, "s": "left"}, {"n": "SCL", "x": 0, "y": 37.5, "s": "left"}, {"n": "SDA", "x": 0, "y": 50.0, "s": "left"}, {"n": "VCC", "x": 25.4, "y": 12.5, "s": "right"}, {"n": "V+ | 16x (PWM", "x": 25.4, "y": 25.0, "s": "right"}, {"n": "V+", "x": 25.4, "y": 37.5, "s": "right"}, {"n": "GND)", "x": 25.4, "y": 50.0, "s": "right"}]},
+  {id:'act009',cat:'Motors & Relays',name:"SG90 / MG90S Micro Servo Header & Mount",sub:"3-Pin 2.54mm PWM Header, 3-pin, 2.54\u00d77.62mm",w:2.54,h:7.62,pins:3,icon:'MOT',color:'#3a2a0a',holes:[],pinout:[{"n": "1:GND (Brown)", "x": 0, "y": 3.8, "s": "left"}, {"n": "2:VCC (Red)", "x": 2.54, "y": 3.8, "s": "right"}, {"n": "3:PWM Signal (Orange)", "x": 2.54, "y": 7.6, "s": "right"}]},
+  {id:'act010',cat:'Motors & Relays',name:"10mm Mini Vibration Coin Motor (ERM)",sub:"2-Lead Flying Wire / Pad, 2-pin, 10.0\u00d710.0mm",w:10.0,h:10.0,pins:2,icon:'MOT',color:'#3a2a0a',holes:[],pinout:[{"n": "1:Positive (+ Red)", "x": 0, "y": 5.0, "s": "left"}, {"n": "2:Negative (- Blue/Black)", "x": 10.0, "y": 5.0, "s": "right"}]},
+  {id:'pwr001',cat:'Power Management',name:"LM7805 / LM7809 / LM7812 / LM317",sub:"TO-220 Through-Hole, 3-pin, 4.6\u00d710.4mm",w:4.6,h:10.4,pins:3,icon:'PWR',color:'#1a2a3a',holes:[],pinout:[{"n": "78xx: 1:IN", "x": 0, "y": 3.5, "s": "left"}, {"n": "2:GND", "x": 0, "y": 6.9, "s": "left"}, {"n": "3:OUT | LM317: 1:ADJ", "x": 4.6, "y": 3.5, "s": "right"}, {"n": "2:OUT", "x": 4.6, "y": 6.9, "s": "right"}, {"n": "3:IN", "x": 4.6, "y": 10.4, "s": "right"}]},
+  {id:'pwr002',cat:'Power Management',name:"AMS1117-3.3 / 5.0 Step-Down Module",sub:"3-Pin / 4-Pin Mini Breakout, 3-pin, 12.0\u00d725.0mm",w:12.0,h:25.0,pins:3,icon:'PWR',color:'#1a2a3a',holes:[],pinout:[{"n": "VIN", "x": 0, "y": 12.5, "s": "left"}, {"n": "GND", "x": 12.0, "y": 12.5, "s": "right"}, {"n": "VOUT", "x": 12.0, "y": 25.0, "s": "right"}]},
+  {id:'pwr003',cat:'Power Management',name:"MP1584EN Ultra-Small Adjustable Buck",sub:"4-Pad High-Freq Step-Down, 4-pin, 17.0\u00d722.0mm",w:17.0,h:22.0,pins:4,icon:'PWR',color:'#1a2a3a',holes:[],pinout:[{"n": "IN+", "x": 0, "y": 11.0, "s": "left"}, {"n": "IN- | OUT+", "x": 17.0, "y": 11.0, "s": "right"}, {"n": "OUT- (0.8V - 20V Out)", "x": 17.0, "y": 22.0, "s": "right"}]},
+  {id:'pwr004',cat:'Power Management',name:"LM2596S DC-DC Step-Down Buck Converter",sub:"4-Pad Adjustable Module, 4-pin, 21.0\u00d743.0mm",w:21.0,h:43.0,pins:4,icon:'PWR',color:'#1a2a3a',holes:[{"x": 10.5, "y": 3.5}, {"x": 10.5, "y": 39.5}],pinout:[{"n": "IN+", "x": 0, "y": 21.5, "s": "left"}, {"n": "IN- | OUT+", "x": 21.0, "y": 21.5, "s": "right"}, {"n": "OUT- (1.25V - 35V Out)", "x": 21.0, "y": 43.0, "s": "right"}]},
+  {id:'pwr005',cat:'Power Management',name:"MT3608 2A DC-DC Step-Up Boost Converter",sub:"4-Pad Adjustable Boost, 4-pin, 17.0\u00d736.0mm",w:17.0,h:36.0,pins:4,icon:'PWR',color:'#1a2a3a',holes:[],pinout:[{"n": "VIN+", "x": 0, "y": 18.0, "s": "left"}, {"n": "VIN- | VOUT+", "x": 17.0, "y": 18.0, "s": "right"}, {"n": "VOUT- (5V - 28V Out)", "x": 17.0, "y": 36.0, "s": "right"}]},
+  {id:'pwr006',cat:'Power Management',name:"TP4056 USB-C 1A Li-Ion Charger + DW01A",sub:"6-Pad Protected Charger, 6-pin, 17.2\u00d728.0mm",w:17.2,h:28.0,pins:6,icon:'PWR',color:'#1a2a3a',holes:[],pinout:[{"n": "IN+", "x": 0, "y": 9.3, "s": "left"}, {"n": "IN- | B+", "x": 0, "y": 18.7, "s": "left"}, {"n": "B-", "x": 17.2, "y": 9.3, "s": "right"}, {"n": "OUT+", "x": 17.2, "y": 18.7, "s": "right"}, {"n": "OUT-", "x": 17.2, "y": 28.0, "s": "right"}]},
+  {id:'pwr007',cat:'Power Management',name:"CN3791 MPPT Solar Li-Ion Charger Module",sub:"JST-PH 2-Pin Solar/Bat/Load, 6-pin, 30.0\u00d745.0mm",w:30.0,h:45.0,pins:6,icon:'PWR',color:'#1a2a3a',holes:[{"x": 3.5, "y": 3.5}, {"x": 26.5, "y": 3.5}, {"x": 3.5, "y": 41.5}, {"x": 26.5, "y": 41.5}],pinout:[{"n": "SOLAR+", "x": 0, "y": 15.0, "s": "left"}, {"n": "SOLAR- | BAT+", "x": 0, "y": 30.0, "s": "left"}, {"n": "BAT- | LOAD+", "x": 30.0, "y": 15.0, "s": "right"}, {"n": "LOAD-", "x": 30.0, "y": 30.0, "s": "right"}]},
+  {id:'pwr008',cat:'Power Management',name:"5x20mm PCB Fuse Holder + Glass Fuse",sub:"2-Pin 22.5mm Pitch, 2-pin, 8.5\u00d722.5mm",w:8.5,h:22.5,pins:2,icon:'PWR',color:'#1a2a3a',holes:[],pinout:[{"n": "Non-Polarized (1", "x": 0, "y": 11.2, "s": "left"}, {"n": "2)", "x": 8.5, "y": 11.2, "s": "right"}]},
+  {id:'pwr009',cat:'Power Management',name:"PPTC Resettable Polyfuse (RXEF Series)",sub:"2-Pin Radial 5.08mm Pitch, 2-pin, 3.0\u00d77.4mm",w:3.0,h:7.4,pins:2,icon:'PWR',color:'#1a2a3a',holes:[],pinout:[{"n": "Non-Polarized (1", "x": 0, "y": 3.7, "s": "left"}, {"n": "2)", "x": 3.0, "y": 3.7, "s": "right"}]},
+  {id:'pwr010',cat:'Power Management',name:"MOV Metal Oxide Varistor (10D471K)",sub:"2-Pin Radial 7.5mm Pitch, 2-pin, 4.5\u00d710.0mm",w:4.5,h:10.0,pins:2,icon:'PWR',color:'#1a2a3a',holes:[],pinout:[{"n": "Non-Polarized (1", "x": 0, "y": 5.0, "s": "left"}, {"n": "2)", "x": 4.5, "y": 5.0, "s": "right"}]},
+  {id:'pwr011',cat:'Power Management',name:"18650 Single / Dual PCB Battery Holder",sub:"2-Pin Through-Hole, 2-pin, 21.0\u00d777.5mm",w:21.0,h:77.5,pins:2,icon:'PWR',color:'#1a2a3a',holes:[{"x": 10.5, "y": 3.5}, {"x": 10.5, "y": 74.0}],pinout:[{"n": "1:Positive (+)", "x": 0, "y": 38.8, "s": "left"}, {"n": "2:Negative (-)", "x": 21.0, "y": 38.8, "s": "right"}]},
+  {id:'pwr012',cat:'Power Management',name:"CR2032 Coin Cell Holder",sub:"2-Pin Through-Hole, 2-pin, 21.5\u00d723.5mm",w:21.5,h:23.5,pins:2,icon:'PWR',color:'#1a2a3a',holes:[],pinout:[{"n": "1:Positive (+)", "x": 0, "y": 11.8, "s": "left"}, {"n": "2:Negative (-)", "x": 21.5, "y": 11.8, "s": "right"}]},
+  {id:'wir001',cat:'Wireless & RF',name:"RFM95W / SX1276 915MHz LoRa Module",sub:"16-Pin 2.0mm Castellated, 16-pin, 16.0\u00d716.0mm",w:16.0,h:16.0,pins:16,icon:'RF',color:'#2a1a3a',holes:[],pinout:[{"n": "GND", "x": 0, "y": 3.2, "s": "left"}, {"n": "MISO", "x": 0, "y": 6.4, "s": "left"}, {"n": "MOSI", "x": 0, "y": 9.6, "s": "left"}, {"n": "SCK", "x": 0, "y": 12.8, "s": "left"}, {"n": "NSS", "x": 16.0, "y": 3.2, "s": "right"}, {"n": "RESET", "x": 16.0, "y": 6.4, "s": "right"}, {"n": "DIO0-5", "x": 16.0, "y": 9.6, "s": "right"}, {"n": "3.3V", "x": 16.0, "y": 12.8, "s": "right"}, {"n": "ANT", "x": 16.0, "y": 16.0, "s": "right"}]},
+  {id:'wir002',cat:'Wireless & RF',name:"SX1262 LoRa Core Module (E22-900M22S)",sub:"22-Pin Long-Range LoRa, 22-pin, 14.0\u00d720.0mm",w:14.0,h:20.0,pins:22,icon:'RF',color:'#2a1a3a',holes:[],pinout:[{"n": "VCC", "x": 0, "y": 3.3, "s": "left"}, {"n": "GND", "x": 0, "y": 6.7, "s": "left"}, {"n": "SCK", "x": 0, "y": 10.0, "s": "left"}, {"n": "MISO", "x": 0, "y": 13.3, "s": "left"}, {"n": "MOSI", "x": 0, "y": 16.7, "s": "left"}, {"n": "NSS", "x": 14.0, "y": 3.3, "s": "right"}, {"n": "BUSY", "x": 14.0, "y": 6.7, "s": "right"}, {"n": "DIO1", "x": 14.0, "y": 10.0, "s": "right"}, {"n": "NRST", "x": 14.0, "y": 13.3, "s": "right"}, {"n": "ANT", "x": 14.0, "y": 16.7, "s": "right"}]},
+  {id:'wir003',cat:'Wireless & RF',name:"nRF24L01+ 2.4GHz Wireless Transceiver",sub:"2x4 8-Pin Header, 8-pin, 15.0\u00d729.0mm",w:15.0,h:29.0,pins:8,icon:'RF',color:'#2a1a3a',holes:[],pinout:[{"n": "GND", "x": 0, "y": 5.8, "s": "left"}, {"n": "VCC", "x": 0, "y": 11.6, "s": "left"}, {"n": "CE", "x": 0, "y": 17.4, "s": "left"}, {"n": "CSN", "x": 0, "y": 23.2, "s": "left"}, {"n": "SCK", "x": 15.0, "y": 5.8, "s": "right"}, {"n": "MOSI", "x": 15.0, "y": 11.6, "s": "right"}, {"n": "MISO", "x": 15.0, "y": 17.4, "s": "right"}, {"n": "IRQ", "x": 15.0, "y": 23.2, "s": "right"}]},
+  {id:'wir004',cat:'Wireless & RF',name:"CC1101 433MHz / 915MHz RF Transceiver",sub:"8-Pin / 10-Pin Module, 8-pin, 15.0\u00d728.0mm",w:15.0,h:28.0,pins:8,icon:'RF',color:'#2a1a3a',holes:[],pinout:[{"n": "GND", "x": 0, "y": 5.6, "s": "left"}, {"n": "VCC", "x": 0, "y": 11.2, "s": "left"}, {"n": "GDO0", "x": 0, "y": 16.8, "s": "left"}, {"n": "CSN", "x": 0, "y": 22.4, "s": "left"}, {"n": "SCK", "x": 15.0, "y": 5.6, "s": "right"}, {"n": "MOSI", "x": 15.0, "y": 11.2, "s": "right"}, {"n": "MISO", "x": 15.0, "y": 16.8, "s": "right"}, {"n": "GDO2", "x": 15.0, "y": 22.4, "s": "right"}]},
+  {id:'wir005',cat:'Wireless & RF',name:"NEO-6M / NEO-M8N GPS Receiver Module",sub:"4-Pin / 5-Pin UART + PPS, 5-pin, 25.0\u00d735.0mm",w:25.0,h:35.0,pins:5,icon:'RF',color:'#2a1a3a',holes:[{"x": 3.5, "y": 3.5}, {"x": 21.5, "y": 3.5}, {"x": 3.5, "y": 31.5}, {"x": 21.5, "y": 31.5}],pinout:[{"n": "VCC", "x": 0, "y": 11.7, "s": "left"}, {"n": "RX", "x": 0, "y": 23.3, "s": "left"}, {"n": "TX", "x": 25.0, "y": 11.7, "s": "right"}, {"n": "GND", "x": 25.0, "y": 23.3, "s": "right"}, {"n": "PPS", "x": 25.0, "y": 35.0, "s": "right"}]},
+  {id:'wir006',cat:'Wireless & RF',name:"MFRC522 13.56MHz RFID Reader/Writer",sub:"8-Pin SPI Card Reader, 8-pin, 40.0\u00d760.0mm",w:40.0,h:60.0,pins:8,icon:'RF',color:'#2a1a3a',holes:[{"x": 3.5, "y": 3.5}, {"x": 36.5, "y": 3.5}, {"x": 3.5, "y": 56.5}, {"x": 36.5, "y": 56.5}],pinout:[{"n": "SDA", "x": 0, "y": 12.0, "s": "left"}, {"n": "SCK", "x": 0, "y": 24.0, "s": "left"}, {"n": "MOSI", "x": 0, "y": 36.0, "s": "left"}, {"n": "MISO", "x": 0, "y": 48.0, "s": "left"}, {"n": "IRQ", "x": 40.0, "y": 12.0, "s": "right"}, {"n": "GND", "x": 40.0, "y": 24.0, "s": "right"}, {"n": "RST", "x": 40.0, "y": 36.0, "s": "right"}, {"n": "3.3V", "x": 40.0, "y": 48.0, "s": "right"}]},
+  {id:'wir007',cat:'Wireless & RF',name:"PN532 NFC / RFID V3 Multi-Protocol Board",sub:"4-Pin I2C/HSU + 8-Pin SPI, 12-pin, 40.5\u00d742.7mm",w:40.5,h:42.7,pins:12,icon:'RF',color:'#2a1a3a',holes:[{"x": 3.5, "y": 3.5}, {"x": 37.0, "y": 3.5}, {"x": 3.5, "y": 39.2}, {"x": 37.0, "y": 39.2}],pinout:[{"n": "GND", "x": 0, "y": 10.7, "s": "left"}, {"n": "VCC", "x": 0, "y": 21.4, "s": "left"}, {"n": "SDA", "x": 0, "y": 32.0, "s": "left"}, {"n": "SCL | SCK", "x": 40.5, "y": 10.7, "s": "right"}, {"n": "MISO", "x": 40.5, "y": 21.4, "s": "right"}, {"n": "MOSI", "x": 40.5, "y": 32.0, "s": "right"}, {"n": "SS", "x": 40.5, "y": 42.7, "s": "right"}]},
+  {id:'wir008',cat:'Wireless & RF',name:"HC-05 / HC-06 Bluetooth Classic SPP Module",sub:"6-Pin UART Serial, 6-pin, 16.0\u00d737.0mm",w:16.0,h:37.0,pins:6,icon:'RF',color:'#2a1a3a',holes:[],pinout:[{"n": "STATE", "x": 0, "y": 9.2, "s": "left"}, {"n": "RXD", "x": 0, "y": 18.5, "s": "left"}, {"n": "TXD", "x": 0, "y": 27.8, "s": "left"}, {"n": "GND", "x": 16.0, "y": 9.2, "s": "right"}, {"n": "VCC", "x": 16.0, "y": 18.5, "s": "right"}, {"n": "EN", "x": 16.0, "y": 27.8, "s": "right"}]},
+  {id:'dsp001',cat:'Displays & Indicators',name:"0.96\" 128x64 I2C OLED (SSD1306)",sub:"4-Pin I2C Module, 4-pin, 27.3\u00d727.8mm",w:27.3,h:27.8,pins:4,icon:'DSP',color:'#0a2a2a',holes:[{"x": 3.5, "y": 3.5}, {"x": 23.8, "y": 3.5}, {"x": 3.5, "y": 24.3}, {"x": 23.8, "y": 24.3}],pinout:[{"n": "GND", "x": 0, "y": 9.3, "s": "left"}, {"n": "VCC", "x": 0, "y": 18.5, "s": "left"}, {"n": "SCL", "x": 27.3, "y": 9.3, "s": "right"}, {"n": "SDA", "x": 27.3, "y": 18.5, "s": "right"}]},
+  {id:'dsp002',cat:'Displays & Indicators',name:"1.3\" 128x64 I2C OLED (SH1106)",sub:"4-Pin I2C Module, 4-pin, 33.5\u00d735.5mm",w:33.5,h:35.5,pins:4,icon:'DSP',color:'#0a2a2a',holes:[{"x": 3.5, "y": 3.5}, {"x": 30.0, "y": 3.5}, {"x": 3.5, "y": 32.0}, {"x": 30.0, "y": 32.0}],pinout:[{"n": "VCC", "x": 0, "y": 11.8, "s": "left"}, {"n": "GND", "x": 0, "y": 23.7, "s": "left"}, {"n": "SCL", "x": 33.5, "y": 11.8, "s": "right"}, {"n": "SDA", "x": 33.5, "y": 23.7, "s": "right"}]},
+  {id:'dsp003',cat:'Displays & Indicators',name:"1.8\" ST7735 128x160 Full-Color SPI TFT",sub:"8-Pin SPI + SD Slot, 8-pin, 35.0\u00d756.0mm",w:35.0,h:56.0,pins:8,icon:'DSP',color:'#0a2a2a',holes:[{"x": 3.5, "y": 3.5}, {"x": 31.5, "y": 3.5}, {"x": 3.5, "y": 52.5}, {"x": 31.5, "y": 52.5}],pinout:[{"n": "GND", "x": 0, "y": 11.2, "s": "left"}, {"n": "VCC", "x": 0, "y": 22.4, "s": "left"}, {"n": "SCL", "x": 0, "y": 33.6, "s": "left"}, {"n": "SDA", "x": 0, "y": 44.8, "s": "left"}, {"n": "RES", "x": 35.0, "y": 11.2, "s": "right"}, {"n": "DC", "x": 35.0, "y": 22.4, "s": "right"}, {"n": "CS", "x": 35.0, "y": 33.6, "s": "right"}, {"n": "BL", "x": 35.0, "y": 44.8, "s": "right"}]},
+  {id:'dsp004',cat:'Displays & Indicators',name:"2.4\" / 2.8\" ILI9341 240x320 SPI Touch TFT",sub:"14-Pin Display + Touch + SD, 14-pin, 50.0\u00d786.0mm",w:50.0,h:86.0,pins:14,icon:'DSP',color:'#0a2a2a',holes:[{"x": 3.5, "y": 3.5}, {"x": 46.5, "y": 3.5}, {"x": 3.5, "y": 82.5}, {"x": 46.5, "y": 82.5}],pinout:[{"n": "VCC", "x": 0, "y": 12.3, "s": "left"}, {"n": "GND", "x": 0, "y": 24.6, "s": "left"}, {"n": "CS", "x": 0, "y": 36.9, "s": "left"}, {"n": "RESET", "x": 0, "y": 49.1, "s": "left"}, {"n": "DC", "x": 0, "y": 61.4, "s": "left"}, {"n": "MOSI", "x": 0, "y": 73.7, "s": "left"}, {"n": "SCK", "x": 50.0, "y": 12.3, "s": "right"}, {"n": "LED", "x": 50.0, "y": 24.6, "s": "right"}, {"n": "MISO + T_CLK", "x": 50.0, "y": 36.9, "s": "right"}, {"n": "T_CS", "x": 50.0, "y": 49.1, "s": "right"}, {"n": "T_DIN", "x": 50.0, "y": 61.4, "s": "right"}, {"n": "T_DO", "x": 50.0, "y": 73.7, "s": "right"}, {"n": "T_IRQ", "x": 50.0, "y": 86.0, "s": "right"}]},
+  {id:'dsp005',cat:'Displays & Indicators',name:"16x2 Character LCD w/ PCF8574 I2C Backpack",sub:"4-Pin I2C Module, 4-pin, 36.0\u00d780.0mm",w:36.0,h:80.0,pins:4,icon:'DSP',color:'#0a2a2a',holes:[{"x": 3.5, "y": 3.5}, {"x": 32.5, "y": 3.5}, {"x": 3.5, "y": 76.5}, {"x": 32.5, "y": 76.5}],pinout:[{"n": "GND", "x": 0, "y": 26.7, "s": "left"}, {"n": "VCC", "x": 0, "y": 53.3, "s": "left"}, {"n": "SDA", "x": 36.0, "y": 26.7, "s": "right"}, {"n": "SCL", "x": 36.0, "y": 53.3, "s": "right"}]},
+  {id:'dsp006',cat:'Displays & Indicators',name:"1.54\" / 2.9\" Waveshare E-Paper SPI Module",sub:"8-Pin Ultra-Low-Power Display, 8-pin, 37.0\u00d789.5mm",w:37.0,h:89.5,pins:8,icon:'DSP',color:'#0a2a2a',holes:[{"x": 3.5, "y": 3.5}, {"x": 33.5, "y": 3.5}, {"x": 3.5, "y": 86.0}, {"x": 33.5, "y": 86.0}],pinout:[{"n": "VCC", "x": 0, "y": 17.9, "s": "left"}, {"n": "GND", "x": 0, "y": 35.8, "s": "left"}, {"n": "DIN", "x": 0, "y": 53.7, "s": "left"}, {"n": "CLK", "x": 0, "y": 71.6, "s": "left"}, {"n": "CS", "x": 37.0, "y": 17.9, "s": "right"}, {"n": "DC", "x": 37.0, "y": 35.8, "s": "right"}, {"n": "RST", "x": 37.0, "y": 53.7, "s": "right"}, {"n": "BUSY", "x": 37.0, "y": 71.6, "s": "right"}]},
+  {id:'dsp007',cat:'Displays & Indicators',name:"TM1637 4-Digit 7-Segment LED Module",sub:"4-Pin CLK/DIO Display, 4-pin, 19.0\u00d742.0mm",w:19.0,h:42.0,pins:4,icon:'DSP',color:'#0a2a2a',holes:[{"x": 3.5, "y": 3.5}, {"x": 15.5, "y": 3.5}, {"x": 3.5, "y": 38.5}, {"x": 15.5, "y": 38.5}],pinout:[{"n": "CLK", "x": 0, "y": 14.0, "s": "left"}, {"n": "DIO", "x": 0, "y": 28.0, "s": "left"}, {"n": "VCC", "x": 19.0, "y": 14.0, "s": "right"}, {"n": "GND", "x": 19.0, "y": 28.0, "s": "right"}]},
+  {id:'dsp008',cat:'Displays & Indicators',name:"MAX7219 8x8 Dot Matrix LED Module",sub:"5-Pin Cascadable SPI, 5-pin, 32.0\u00d732.0mm",w:32.0,h:32.0,pins:5,icon:'DSP',color:'#0a2a2a',holes:[{"x": 3.5, "y": 3.5}, {"x": 28.5, "y": 3.5}, {"x": 3.5, "y": 28.5}, {"x": 28.5, "y": 28.5}],pinout:[{"n": "VCC", "x": 0, "y": 10.7, "s": "left"}, {"n": "GND", "x": 0, "y": 21.3, "s": "left"}, {"n": "DIN", "x": 32.0, "y": 10.7, "s": "right"}, {"n": "CS", "x": 32.0, "y": 21.3, "s": "right"}, {"n": "CLK", "x": 32.0, "y": 32.0, "s": "right"}]},
+  {id:'dsp009',cat:'Displays & Indicators',name:"3mm / 5mm Standard Through-Hole LED",sub:"T-1 / T-1 3/4 Radial, 2-pin, 5.8\u00d75.8mm",w:5.8,h:5.8,pins:2,icon:'DSP',color:'#0a2a2a',holes:[],pinout:[{"n": "1:Anode (+ Long)", "x": 0, "y": 2.9, "s": "left"}, {"n": "2:Cathode (- Flat)", "x": 5.8, "y": 2.9, "s": "right"}]},
+  {id:'dsp010',cat:'Displays & Indicators',name:"WS2812B 5mm / 8mm Addressable RGB LED",sub:"4-Pin Radial / Mini PCB, 4-pin, 5.8\u00d75.8mm",w:5.8,h:5.8,pins:4,icon:'DSP',color:'#0a2a2a',holes:[],pinout:[{"n": "1:DOUT", "x": 0, "y": 1.9, "s": "left"}, {"n": "2:VDD (5V)", "x": 0, "y": 3.9, "s": "left"}, {"n": "3:GND", "x": 5.8, "y": 1.9, "s": "right"}, {"n": "4:DIN", "x": 5.8, "y": 3.9, "s": "right"}]},
+  {id:'dsp011',cat:'Displays & Indicators',name:"12mm Active / Passive Piezo Buzzer",sub:"2-Pin 7.62mm Pitch, 2-pin, 12.0\u00d712.0mm",w:12.0,h:12.0,pins:2,icon:'DSP',color:'#0a2a2a',holes:[],pinout:[{"n": "1:Positive (+)", "x": 0, "y": 6.0, "s": "left"}, {"n": "2:Negative (-)", "x": 12.0, "y": 6.0, "s": "right"}]},
+  {id:'ic001',cat:'Integrated Circuits',name:"NE555 / TLC555 Precision Timer",sub:"8-Pin DIP, 8-pin, 7.62\u00d79.8mm",w:7.62,h:9.8,pins:8,icon:'IC',color:'#2a2a1a',holes:[],pinout:[{"n": "1:GND", "x": 0, "y": 2.0, "s": "left"}, {"n": "2:TRIG", "x": 0, "y": 3.9, "s": "left"}, {"n": "3:OUT", "x": 0, "y": 5.9, "s": "left"}, {"n": "4:RESET", "x": 0, "y": 7.8, "s": "left"}, {"n": "5:CTRL", "x": 7.62, "y": 2.0, "s": "right"}, {"n": "6:THRES", "x": 7.62, "y": 3.9, "s": "right"}, {"n": "7:DISCH", "x": 7.62, "y": 5.9, "s": "right"}, {"n": "8:VCC", "x": 7.62, "y": 7.8, "s": "right"}]},
+  {id:'ic002',cat:'Integrated Circuits',name:"74HC595 8-Bit Serial-In Parallel-Out",sub:"16-Pin DIP, 16-pin, 7.62\u00d719.3mm",w:7.62,h:19.3,pins:16,icon:'IC',color:'#2a2a1a',holes:[],pinout:[{"n": "QB-QH", "x": 0, "y": 3.2, "s": "left"}, {"n": "GND", "x": 0, "y": 6.4, "s": "left"}, {"n": "QH'", "x": 0, "y": 9.7, "s": "left"}, {"n": "SRCLR", "x": 0, "y": 12.9, "s": "left"}, {"n": "SRCLK", "x": 0, "y": 16.1, "s": "left"}, {"n": "RCLK", "x": 7.62, "y": 3.2, "s": "right"}, {"n": "OE", "x": 7.62, "y": 6.4, "s": "right"}, {"n": "SER", "x": 7.62, "y": 9.7, "s": "right"}, {"n": "QA", "x": 7.62, "y": 12.9, "s": "right"}, {"n": "VCC", "x": 7.62, "y": 16.1, "s": "right"}]},
+  {id:'ic003',cat:'Integrated Circuits',name:"74HC165 8-Bit Parallel-In Serial-Out",sub:"16-Pin DIP, 16-pin, 7.62\u00d719.3mm",w:7.62,h:19.3,pins:16,icon:'IC',color:'#2a2a1a',holes:[],pinout:[{"n": "SH/LD", "x": 0, "y": 2.1, "s": "left"}, {"n": "CLK", "x": 0, "y": 4.3, "s": "left"}, {"n": "E", "x": 0, "y": 6.4, "s": "left"}, {"n": "F", "x": 0, "y": 8.6, "s": "left"}, {"n": "G", "x": 0, "y": 10.7, "s": "left"}, {"n": "H", "x": 0, "y": 12.9, "s": "left"}, {"n": "QH'", "x": 0, "y": 15.0, "s": "left"}, {"n": "GND", "x": 0, "y": 17.2, "s": "left"}, {"n": "QH", "x": 7.62, "y": 2.1, "s": "right"}, {"n": "SER", "x": 7.62, "y": 4.3, "s": "right"}, {"n": "A", "x": 7.62, "y": 6.4, "s": "right"}, {"n": "B", "x": 7.62, "y": 8.6, "s": "right"}, {"n": "C", "x": 7.62, "y": 10.7, "s": "right"}, {"n": "D", "x": 7.62, "y": 12.9, "s": "right"}, {"n": "CLK_INH", "x": 7.62, "y": 15.0, "s": "right"}, {"n": "VCC", "x": 7.62, "y": 17.2, "s": "right"}]},
+  {id:'ic004',cat:'Integrated Circuits',name:"PCF8574 / MCP23017 I2C GPIO Expander",sub:"16-Pin / 28-Pin DIP, 16-pin, 7.62\u00d719.3mm",w:7.62,h:19.3,pins:16,icon:'IC',color:'#2a2a1a',holes:[],pinout:[{"n": "A0-A2", "x": 0, "y": 3.9, "s": "left"}, {"n": "P0-P3", "x": 0, "y": 7.7, "s": "left"}, {"n": "VSS", "x": 0, "y": 11.6, "s": "left"}, {"n": "P4-P7", "x": 0, "y": 15.4, "s": "left"}, {"n": "INT", "x": 7.62, "y": 3.9, "s": "right"}, {"n": "SCL", "x": 7.62, "y": 7.7, "s": "right"}, {"n": "SDA", "x": 7.62, "y": 11.6, "s": "right"}, {"n": "VDD", "x": 7.62, "y": 15.4, "s": "right"}]},
+  {id:'ic005',cat:'Integrated Circuits',name:"74HC14 / CD40106 Hex Schmitt Inverter",sub:"14-Pin DIP, 14-pin, 7.62\u00d719.3mm",w:7.62,h:19.3,pins:14,icon:'IC',color:'#2a2a1a',holes:[],pinout:[{"n": "1A/1Y - 6A/6Y", "x": 0, "y": 9.7, "s": "left"}, {"n": "GND", "x": 7.62, "y": 9.7, "s": "right"}, {"n": "VCC", "x": 7.62, "y": 19.3, "s": "right"}]},
+  {id:'ic006',cat:'Integrated Circuits',name:"74AHCT125 Quad Level-Shifter Buffer (3.3V->5V)",sub:"14-Pin DIP, 14-pin, 7.62\u00d719.3mm",w:7.62,h:19.3,pins:14,icon:'IC',color:'#2a2a1a',holes:[],pinout:[{"n": "1OE", "x": 0, "y": 2.4, "s": "left"}, {"n": "1A", "x": 0, "y": 4.8, "s": "left"}, {"n": "1Y", "x": 0, "y": 7.2, "s": "left"}, {"n": "2OE", "x": 0, "y": 9.7, "s": "left"}, {"n": "2A", "x": 0, "y": 12.1, "s": "left"}, {"n": "2Y", "x": 0, "y": 14.5, "s": "left"}, {"n": "GND", "x": 0, "y": 16.9, "s": "left"}, {"n": "3Y", "x": 7.62, "y": 2.4, "s": "right"}, {"n": "3A", "x": 7.62, "y": 4.8, "s": "right"}, {"n": "3OE", "x": 7.62, "y": 7.2, "s": "right"}, {"n": "4Y", "x": 7.62, "y": 9.7, "s": "right"}, {"n": "4A", "x": 7.62, "y": 12.1, "s": "right"}, {"n": "4OE", "x": 7.62, "y": 14.5, "s": "right"}, {"n": "VCC", "x": 7.62, "y": 16.9, "s": "right"}]},
+  {id:'ic007',cat:'Integrated Circuits',name:"CD4051 / CD74HC4067 8-Ch / 16-Ch Analog Mux",sub:"16-Pin DIP / 24-Pin Breakout, 16-pin, 7.62\u00d719.3mm",w:7.62,h:19.3,pins:16,icon:'IC',color:'#2a2a1a',holes:[],pinout:[{"n": "CH0-CH7", "x": 0, "y": 3.9, "s": "left"}, {"n": "COM", "x": 0, "y": 7.7, "s": "left"}, {"n": "INH", "x": 0, "y": 11.6, "s": "left"}, {"n": "A", "x": 0, "y": 15.4, "s": "left"}, {"n": "B", "x": 7.62, "y": 3.9, "s": "right"}, {"n": "C", "x": 7.62, "y": 7.7, "s": "right"}, {"n": "VEE", "x": 7.62, "y": 11.6, "s": "right"}, {"n": "VSS", "x": 7.62, "y": 15.4, "s": "right"}, {"n": "VDD", "x": 7.62, "y": 19.3, "s": "right"}]},
+  {id:'ic008',cat:'Integrated Circuits',name:"LM358 / TL072 Dual Op-Amp",sub:"8-Pin DIP, 8-pin, 7.62\u00d79.8mm",w:7.62,h:9.8,pins:8,icon:'IC',color:'#2a2a1a',holes:[],pinout:[{"n": "1:OUT1", "x": 0, "y": 2.0, "s": "left"}, {"n": "2:IN1-", "x": 0, "y": 3.9, "s": "left"}, {"n": "3:IN1+", "x": 0, "y": 5.9, "s": "left"}, {"n": "4:V-", "x": 0, "y": 7.8, "s": "left"}, {"n": "5:IN2+", "x": 7.62, "y": 2.0, "s": "right"}, {"n": "6:IN2-", "x": 7.62, "y": 3.9, "s": "right"}, {"n": "7:OUT2", "x": 7.62, "y": 5.9, "s": "right"}, {"n": "8:V+", "x": 7.62, "y": 7.8, "s": "right"}]},
+  {id:'ic009',cat:'Integrated Circuits',name:"LM339 Quad Voltage Comparator",sub:"14-Pin DIP, 14-pin, 7.62\u00d719.3mm",w:7.62,h:19.3,pins:14,icon:'IC',color:'#2a2a1a',holes:[],pinout:[{"n": "OUT2", "x": 0, "y": 2.4, "s": "left"}, {"n": "OUT1", "x": 0, "y": 4.8, "s": "left"}, {"n": "VCC", "x": 0, "y": 7.2, "s": "left"}, {"n": "IN1-", "x": 0, "y": 9.7, "s": "left"}, {"n": "IN1+", "x": 0, "y": 12.1, "s": "left"}, {"n": "IN2-", "x": 0, "y": 14.5, "s": "left"}, {"n": "IN2+", "x": 0, "y": 16.9, "s": "left"}, {"n": "IN3-", "x": 7.62, "y": 2.4, "s": "right"}, {"n": "IN3+", "x": 7.62, "y": 4.8, "s": "right"}, {"n": "IN4-", "x": 7.62, "y": 7.2, "s": "right"}, {"n": "IN4+", "x": 7.62, "y": 9.7, "s": "right"}, {"n": "GND", "x": 7.62, "y": 12.1, "s": "right"}, {"n": "OUT4", "x": 7.62, "y": 14.5, "s": "right"}, {"n": "OUT3", "x": 7.62, "y": 16.9, "s": "right"}]},
+  {id:'ic010',cat:'Integrated Circuits',name:"ADS1115 16-Bit 4-Ch I2C ADC Module",sub:"10-Pin Programmable Gain ADC, 10-pin, 17.5\u00d728.0mm",w:17.5,h:28.0,pins:10,icon:'IC',color:'#2a2a1a',holes:[{"x": 8.75, "y": 3.5}, {"x": 8.75, "y": 24.5}],pinout:[{"n": "VDD", "x": 0, "y": 4.7, "s": "left"}, {"n": "GND", "x": 0, "y": 9.3, "s": "left"}, {"n": "SCL", "x": 0, "y": 14.0, "s": "left"}, {"n": "SDA", "x": 0, "y": 18.7, "s": "left"}, {"n": "ADDR", "x": 0, "y": 23.3, "s": "left"}, {"n": "ALRT", "x": 17.5, "y": 4.7, "s": "right"}, {"n": "A0", "x": 17.5, "y": 9.3, "s": "right"}, {"n": "A1", "x": 17.5, "y": 14.0, "s": "right"}, {"n": "A2", "x": 17.5, "y": 18.7, "s": "right"}, {"n": "A3", "x": 17.5, "y": 23.3, "s": "right"}]},
+  {id:'ic011',cat:'Integrated Circuits',name:"MCP3008 10-Bit 8-Ch SPI ADC",sub:"16-Pin DIP, 16-pin, 7.62\u00d719.3mm",w:7.62,h:19.3,pins:16,icon:'IC',color:'#2a2a1a',holes:[],pinout:[{"n": "CH0-CH7", "x": 0, "y": 3.9, "s": "left"}, {"n": "DGND", "x": 0, "y": 7.7, "s": "left"}, {"n": "CS", "x": 0, "y": 11.6, "s": "left"}, {"n": "DIN", "x": 0, "y": 15.4, "s": "left"}, {"n": "DOUT", "x": 7.62, "y": 3.9, "s": "right"}, {"n": "CLK", "x": 7.62, "y": 7.7, "s": "right"}, {"n": "AGND", "x": 7.62, "y": 11.6, "s": "right"}, {"n": "VREF", "x": 7.62, "y": 15.4, "s": "right"}, {"n": "VDD", "x": 7.62, "y": 19.3, "s": "right"}]},
+  {id:'ic012',cat:'Integrated Circuits',name:"DS3231 Precision I2C Real-Time Clock Module",sub:"6-Pin Battery-Backed RTC, 6-pin, 22.0\u00d738.0mm",w:22.0,h:38.0,pins:6,icon:'IC',color:'#2a2a1a',holes:[{"x": 11.0, "y": 3.5}, {"x": 11.0, "y": 34.5}],pinout:[{"n": "32K", "x": 0, "y": 9.5, "s": "left"}, {"n": "SQW", "x": 0, "y": 19.0, "s": "left"}, {"n": "SCL", "x": 0, "y": 28.5, "s": "left"}, {"n": "SDA", "x": 22.0, "y": 9.5, "s": "right"}, {"n": "VCC", "x": 22.0, "y": 19.0, "s": "right"}, {"n": "GND", "x": 22.0, "y": 28.5, "s": "right"}]},
+  {id:'ic013',cat:'Integrated Circuits',name:"24LC256 256Kbit I2C EEPROM",sub:"8-Pin DIP, 8-pin, 7.62\u00d79.8mm",w:7.62,h:9.8,pins:8,icon:'IC',color:'#2a2a1a',holes:[],pinout:[{"n": "A0", "x": 0, "y": 2.0, "s": "left"}, {"n": "A1", "x": 0, "y": 3.9, "s": "left"}, {"n": "A2", "x": 0, "y": 5.9, "s": "left"}, {"n": "VSS", "x": 0, "y": 7.8, "s": "left"}, {"n": "SDA", "x": 7.62, "y": 2.0, "s": "right"}, {"n": "SCL", "x": 7.62, "y": 3.9, "s": "right"}, {"n": "WP", "x": 7.62, "y": 5.9, "s": "right"}, {"n": "VCC", "x": 7.62, "y": 7.8, "s": "right"}]},
+  {id:'ic014',cat:'Integrated Circuits',name:"PC817 / 4N35 Phototransistor Optocoupler",sub:"4-Pin / 6-Pin DIP Isolation, 4-pin, 7.62\u00d76.5mm",w:7.62,h:6.5,pins:4,icon:'IC',color:'#2a2a1a',holes:[],pinout:[{"n": "1:Anode", "x": 0, "y": 2.2, "s": "left"}, {"n": "2:Cathode", "x": 0, "y": 4.3, "s": "left"}, {"n": "3:Emitter", "x": 7.62, "y": 2.2, "s": "right"}, {"n": "4:Collector", "x": 7.62, "y": 4.3, "s": "right"}]},
+  {id:'dis001',cat:'Discrete Semiconductors',name:"2N2222A / 2N3904 / BC547 NPN Transistor",sub:"TO-92 Through-Hole, 3-pin, 4.5\u00d75.2mm",w:4.5,h:5.2,pins:3,icon:'SEM',color:'#3a1a2a',holes:[],pinout:[{"n": "2N2222: 1:E", "x": 0, "y": 1.7, "s": "left"}, {"n": "2:B", "x": 0, "y": 3.5, "s": "left"}, {"n": "3:C | BC547: 1:C", "x": 4.5, "y": 1.7, "s": "right"}, {"n": "2:B", "x": 4.5, "y": 3.5, "s": "right"}, {"n": "3:E", "x": 4.5, "y": 5.2, "s": "right"}]},
+  {id:'dis002',cat:'Discrete Semiconductors',name:"2N3906 / BC557 PNP Transistor",sub:"TO-92 Through-Hole, 3-pin, 4.5\u00d75.2mm",w:4.5,h:5.2,pins:3,icon:'SEM',color:'#3a1a2a',holes:[],pinout:[{"n": "2N3906: 1:E", "x": 0, "y": 1.7, "s": "left"}, {"n": "2:B", "x": 0, "y": 3.5, "s": "left"}, {"n": "3:C | BC557: 1:C", "x": 4.5, "y": 1.7, "s": "right"}, {"n": "2:B", "x": 4.5, "y": 3.5, "s": "right"}, {"n": "3:E", "x": 4.5, "y": 5.2, "s": "right"}]},
+  {id:'dis003',cat:'Discrete Semiconductors',name:"2N7000 N-Channel Logic-Level MOSFET",sub:"TO-92 Small Signal, 3-pin, 4.5\u00d75.2mm",w:4.5,h:5.2,pins:3,icon:'SEM',color:'#3a1a2a',holes:[],pinout:[{"n": "1:Source", "x": 0, "y": 2.6, "s": "left"}, {"n": "2:Gate", "x": 4.5, "y": 2.6, "s": "right"}, {"n": "3:Drain", "x": 4.5, "y": 5.2, "s": "right"}]},
+  {id:'dis004',cat:'Discrete Semiconductors',name:"IRLZ44N Logic-Level N-Ch Power MOSFET",sub:"TO-220 Through-Hole, 3-pin, 4.6\u00d710.4mm",w:4.6,h:10.4,pins:3,icon:'SEM',color:'#3a1a2a',holes:[],pinout:[{"n": "1:Gate", "x": 0, "y": 5.2, "s": "left"}, {"n": "2:Drain (Tab)", "x": 4.6, "y": 5.2, "s": "right"}, {"n": "3:Source", "x": 4.6, "y": 10.4, "s": "right"}]},
+  {id:'dis005',cat:'Discrete Semiconductors',name:"BT136-600E 4A 600V AC Triac",sub:"TO-220 Through-Hole, 3-pin, 4.6\u00d710.4mm",w:4.6,h:10.4,pins:3,icon:'SEM',color:'#3a1a2a',holes:[],pinout:[{"n": "1:MT1", "x": 0, "y": 5.2, "s": "left"}, {"n": "2:MT2 (Tab)", "x": 4.6, "y": 5.2, "s": "right"}, {"n": "3:Gate", "x": 4.6, "y": 10.4, "s": "right"}]},
+  {id:'dis006',cat:'Discrete Semiconductors',name:"1N4148 High-Speed Switching Diode",sub:"DO-35 Axial (7.62mm pitch), 2-pin, 2.0\u00d77.62mm",w:2.0,h:7.62,pins:2,icon:'SEM',color:'#3a1a2a',holes:[],pinout:[{"n": "1:Anode", "x": 0, "y": 3.8, "s": "left"}, {"n": "2:Cathode (Black Band)", "x": 2.0, "y": 3.8, "s": "right"}]},
+  {id:'dis007',cat:'Discrete Semiconductors',name:"1N4007 Rectifier / 1N5819 Schottky Diode",sub:"DO-41 Axial (10.16mm pitch), 2-pin, 2.7\u00d710.16mm",w:2.7,h:10.16,pins:2,icon:'SEM',color:'#3a1a2a',holes:[],pinout:[{"n": "1:Anode", "x": 0, "y": 5.1, "s": "left"}, {"n": "2:Cathode (Silver Band)", "x": 2.7, "y": 5.1, "s": "right"}]},
+  {id:'dis008',cat:'Discrete Semiconductors',name:"1N4733A (5.1V) / 1N4728A (3.3V) 1W Zener",sub:"DO-41 Axial (10.16mm pitch), 2-pin, 2.7\u00d710.16mm",w:2.7,h:10.16,pins:2,icon:'SEM',color:'#3a1a2a',holes:[],pinout:[{"n": "1:Anode", "x": 0, "y": 5.1, "s": "left"}, {"n": "2:Cathode (Band)", "x": 2.7, "y": 5.1, "s": "right"}]},
+  {id:'dis009',cat:'Discrete Semiconductors',name:"DB107 / W10M Single-Phase Bridge Rectifier",sub:"4-Pin DIP / Round Bridge, 4-pin, 6.5\u00d78.5mm",w:6.5,h:8.5,pins:4,icon:'SEM',color:'#3a1a2a',holes:[],pinout:[{"n": "+", "x": 0, "y": 2.8, "s": "left"}, {"n": "-", "x": 0, "y": 5.7, "s": "left"}, {"n": "AC1", "x": 6.5, "y": 2.8, "s": "right"}, {"n": "AC2", "x": 6.5, "y": 5.7, "s": "right"}]},
+  {id:'pas001',cat:'Passives',name:"1/4W (0.25W) Metal Film Resistor (1% Tol)",sub:"Axial 10.16mm Pitch, 2-pin, 2.5\u00d710.16mm",w:2.5,h:10.16,pins:2,icon:'PAS',color:'#2a2a2a',holes:[],pinout:[{"n": "Non-Polarized (1", "x": 0, "y": 5.1, "s": "left"}, {"n": "2)", "x": 2.5, "y": 5.1, "s": "right"}]},
+  {id:'pas002',cat:'Passives',name:"2W / 5W Ceramic Wirewound Power Resistor",sub:"Axial 22.86mm / 27.94mm Pitch, 2-pin, 6.5\u00d722.86mm",w:6.5,h:22.86,pins:2,icon:'PAS',color:'#2a2a2a',holes:[],pinout:[{"n": "Non-Polarized (1", "x": 0, "y": 11.4, "s": "left"}, {"n": "2)", "x": 6.5, "y": 11.4, "s": "right"}]},
+  {id:'pas003',cat:'Passives',name:"NTC 10K 3950 Thermistor Temperature Sensor",sub:"2-Pin Radial 2.54mm Pitch, 2-pin, 3.0\u00d73.0mm",w:3.0,h:3.0,pins:2,icon:'PAS',color:'#2a2a2a',holes:[],pinout:[{"n": "Non-Polarized (1", "x": 0, "y": 1.5, "s": "left"}, {"n": "2)", "x": 3.0, "y": 1.5, "s": "right"}]},
+  {id:'pas004',cat:'Passives',name:"Ceramic MLCC Capacitor (10pF - 1uF, 50V)",sub:"Radial 2.54mm / 5.08mm Pitch, 2-pin, 3.0\u00d76.0mm",w:3.0,h:6.0,pins:2,icon:'PAS',color:'#2a2a2a',holes:[],pinout:[{"n": "Non-Polarized (1", "x": 0, "y": 3.0, "s": "left"}, {"n": "2)", "x": 3.0, "y": 3.0, "s": "right"}]},
+  {id:'pas005',cat:'Passives',name:"Electrolytic Capacitor (10uF - 1000uF, 25V/50V)",sub:"Radial 5mm-10mm Dia, 2-pin, 8.0\u00d78.0mm",w:8.0,h:8.0,pins:2,icon:'PAS',color:'#2a2a2a',holes:[],pinout:[{"n": "1:Positive (+ Long)", "x": 0, "y": 4.0, "s": "left"}, {"n": "2:Negative (- Stripe)", "x": 8.0, "y": 4.0, "s": "right"}]},
+  {id:'pas006',cat:'Passives',name:"Toroidal / Drum Power Inductor (10uH - 1mH)",sub:"Radial 5.0mm Pitch, 2-pin, 8.0\u00d78.0mm",w:8.0,h:8.0,pins:2,icon:'PAS',color:'#2a2a2a',holes:[],pinout:[{"n": "Non-Polarized (1", "x": 0, "y": 4.0, "s": "left"}, {"n": "2)", "x": 8.0, "y": 4.0, "s": "right"}]},
+  {id:'pas007',cat:'Passives',name:"Axial Ferrite Bead EMI Suppressor",sub:"Axial 10.16mm Pitch, 2-pin, 3.5\u00d710.16mm",w:3.5,h:10.16,pins:2,icon:'PAS',color:'#2a2a2a',holes:[],pinout:[{"n": "Non-Polarized (1", "x": 0, "y": 5.1, "s": "left"}, {"n": "2)", "x": 3.5, "y": 5.1, "s": "right"}]},
+  {id:'pas008',cat:'Passives',name:"HC-49S Quartz Crystal (8MHz / 16MHz / 32.768kHz)",sub:"2-Pin 4.88mm Pitch, 2-pin, 4.7\u00d711.5mm",w:4.7,h:11.5,pins:2,icon:'PAS',color:'#2a2a2a',holes:[],pinout:[{"n": "1:XTAL1", "x": 0, "y": 5.8, "s": "left"}, {"n": "2:XTAL2", "x": 4.7, "y": 5.8, "s": "right"}]},
+  {id:'pas009',cat:'Passives',name:"Rotary Potentiometer (9mm / 16mm Linear B10K)",sub:"3-Pin PCB Mount, 3-pin, 17.0\u00d718.0mm",w:17.0,h:18.0,pins:3,icon:'PAS',color:'#2a2a2a',holes:[],pinout:[{"n": "1:CCW (GND)", "x": 0, "y": 9.0, "s": "left"}, {"n": "2:Wiper (ADC)", "x": 17.0, "y": 9.0, "s": "right"}, {"n": "3:CW (VCC)", "x": 17.0, "y": 18.0, "s": "right"}]},
+  {id:'pas010',cat:'Passives',name:"3296W Multi-Turn Precision Trimpot",sub:"3-Pin 2.54mm Inline, 3-pin, 4.8\u00d79.5mm",w:4.8,h:9.5,pins:3,icon:'PAS',color:'#2a2a2a',holes:[],pinout:[{"n": "1:CCW", "x": 0, "y": 4.8, "s": "left"}, {"n": "2:Wiper", "x": 4.8, "y": 4.8, "s": "right"}, {"n": "3:CW", "x": 4.8, "y": 9.5, "s": "right"}]},
+  {id:'swi001',cat:'Switches & Inputs',name:"6x6mm / 12x12mm Tactile Momentary Switch",sub:"4-Pin Through-Hole, 4-pin, 6.2\u00d76.2mm",w:6.2,h:6.2,pins:4,icon:'SW',color:'#1a3a2a',holes:[],pinout:[{"n": "1-2:Rail A", "x": 0, "y": 3.1, "s": "left"}, {"n": "3-4:Rail B", "x": 6.2, "y": 3.1, "s": "right"}]},
+  {id:'swi002',cat:'Switches & Inputs',name:"Cherry MX / Kailh Choc Mechanical Switch",sub:"PCB Mount Snap-In, 2-pin, 15.6\u00d715.6mm",w:15.6,h:15.6,pins:2,icon:'SW',color:'#1a3a2a',holes:[],pinout:[{"n": "Pin 1", "x": 0, "y": 7.8, "s": "left"}, {"n": "Pin 2", "x": 15.6, "y": 7.8, "s": "right"}]},
+  {id:'swi003',cat:'Switches & Inputs',name:"MTS-102 / 200M Mini Toggle Switch (SPDT/DPDT)",sub:"3-Pin / 6-Pin 4.7mm Pitch, 3-pin, 7.0\u00d713.0mm",w:7.0,h:13.0,pins:3,icon:'SW',color:'#1a3a2a',holes:[],pinout:[{"n": "1:Throw A", "x": 0, "y": 6.5, "s": "left"}, {"n": "2:Common", "x": 7.0, "y": 6.5, "s": "right"}, {"n": "3:Throw B", "x": 7.0, "y": 13.0, "s": "right"}]},
+  {id:'swi004',cat:'Switches & Inputs',name:"SS-12D00 Slide Switch & 8-Pos DIP Switch",sub:"2.54mm Pitch, 3-pin, 4.5\u00d78.6mm",w:4.5,h:8.6,pins:3,icon:'SW',color:'#1a3a2a',holes:[],pinout:[{"n": "1:Throw A", "x": 0, "y": 4.3, "s": "left"}, {"n": "2:Common", "x": 4.5, "y": 4.3, "s": "right"}, {"n": "3:Throw B", "x": 4.5, "y": 8.6, "s": "right"}]},
+  {id:'swi005',cat:'Switches & Inputs',name:"EC11 Rotary Encoder w/ Push Switch",sub:"5-Pin + 2 Ground Tabs, 5-pin, 12.0\u00d713.2mm",w:12.0,h:13.2,pins:5,icon:'SW',color:'#1a3a2a',holes:[{"x": 6.0, "y": 3.5}, {"x": 6.0, "y": 9.7}],pinout:[{"n": "A", "x": 0, "y": 4.4, "s": "left"}, {"n": "GND(C)", "x": 0, "y": 8.8, "s": "left"}, {"n": "B | SW1", "x": 12.0, "y": 4.4, "s": "right"}, {"n": "SW2", "x": 12.0, "y": 8.8, "s": "right"}]},
+  {id:'swi006',cat:'Switches & Inputs',name:"TTP223 Capacitive Touch Sensor Module",sub:"3-Pin Digital Touch Pad, 3-pin, 11.0\u00d715.0mm",w:11.0,h:15.0,pins:3,icon:'SW',color:'#1a3a2a',holes:[],pinout:[{"n": "VCC", "x": 0, "y": 7.5, "s": "left"}, {"n": "I/O", "x": 11.0, "y": 7.5, "s": "right"}, {"n": "GND", "x": 11.0, "y": 15.0, "s": "right"}]},
+  {id:'swi007',cat:'Switches & Inputs',name:"2-Axis Analog Thumb Joystick + Button",sub:"5-Pin Breakout, 5-pin, 26.0\u00d734.0mm",w:26.0,h:34.0,pins:5,icon:'SW',color:'#1a3a2a',holes:[{"x": 3.5, "y": 3.5}, {"x": 22.5, "y": 3.5}, {"x": 3.5, "y": 30.5}, {"x": 22.5, "y": 30.5}],pinout:[{"n": "GND", "x": 0, "y": 11.3, "s": "left"}, {"n": "+5V", "x": 0, "y": 22.7, "s": "left"}, {"n": "VRx", "x": 26.0, "y": 11.3, "s": "right"}, {"n": "VRy", "x": 26.0, "y": 22.7, "s": "right"}, {"n": "SW", "x": 26.0, "y": 34.0, "s": "right"}]},
+  {id:'con001',cat:'Connectors & Hardware',name:"1xN Single Row Male/Female Header (2.54mm)",sub:"0.1\" Standard Pitch, 8-pin, 2.54\u00d720.32mm",w:2.54,h:20.32,pins:8,icon:'CON',color:'#2a1a1a',holes:[],pinout:[{"n": "Configurable 1 to 40 pins", "x": 2.54, "y": 10.2, "s": "right"}]},
+  {id:'con002',cat:'Connectors & Hardware',name:"2xN Dual Row Shrouded IDC Box Header (2.54mm)",sub:"0.1\" Dual Row, 10-pin, 5.08\u00d712.7mm",w:5.08,h:12.7,pins:10,icon:'CON',color:'#2a1a1a',holes:[],pinout:[{"n": "2x5 / 2x8 / 2x10 / 2x20", "x": 5.08, "y": 6.3, "s": "right"}]},
+  {id:'con003',cat:'Connectors & Hardware',name:"JST-XH (2.50mm) / JST-PH (2.0mm) Socket",sub:"2/3/4/5/6-Pin Keyed, 4-pin, 5.8\u00d712.4mm",w:5.8,h:12.4,pins:4,icon:'CON',color:'#2a1a1a',holes:[],pinout:[{"n": "1..N (Qwiic/STEMMA I2C: GND", "x": 0, "y": 4.1, "s": "left"}, {"n": "VCC", "x": 0, "y": 8.3, "s": "left"}, {"n": "SDA", "x": 5.8, "y": 4.1, "s": "right"}, {"n": "SCL)", "x": 5.8, "y": 8.3, "s": "right"}]},
+  {id:'con004',cat:'Connectors & Hardware',name:"5.08mm / 3.5mm Pluggable & Fixed Screw Terminal",sub:"2/3/4-Pin High Current, 2-pin, 7.6\u00d710.16mm",w:7.6,h:10.16,pins:2,icon:'CON',color:'#2a1a1a',holes:[],pinout:[{"n": "1:Terminal 1", "x": 0, "y": 5.1, "s": "left"}, {"n": "2:Terminal 2", "x": 7.6, "y": 5.1, "s": "right"}]},
+  {id:'con005',cat:'Connectors & Hardware',name:"5.5x2.1mm DC Barrel Jack (PCB Mount)",sub:"3-Pin Through-Hole, 3-pin, 9.0\u00d714.4mm",w:9.0,h:14.4,pins:3,icon:'CON',color:'#2a1a1a',holes:[],pinout:[{"n": "1:Center (+)", "x": 0, "y": 7.2, "s": "left"}, {"n": "2:Sleeve (-)", "x": 9.0, "y": 7.2, "s": "right"}, {"n": "3:Switch", "x": 9.0, "y": 14.4, "s": "right"}]},
+  {id:'con006',cat:'Connectors & Hardware',name:"USB-C 6-Pin / 16-Pin Breakout Board",sub:"2.54mm DIP Breakout, 6-pin, 12.0\u00d714.5mm",w:12.0,h:14.5,pins:6,icon:'CON',color:'#2a1a1a',holes:[{"x": 6.0, "y": 3.5}, {"x": 6.0, "y": 11.0}],pinout:[{"n": "VBUS", "x": 0, "y": 3.6, "s": "left"}, {"n": "GND", "x": 0, "y": 7.2, "s": "left"}, {"n": "CC1", "x": 0, "y": 10.9, "s": "left"}, {"n": "CC2", "x": 12.0, "y": 3.6, "s": "right"}, {"n": "D+", "x": 12.0, "y": 7.2, "s": "right"}, {"n": "D-", "x": 12.0, "y": 10.9, "s": "right"}]},
+  {id:'con007',cat:'Connectors & Hardware',name:"RJ45 8P8C Ethernet / RS485 Jack Breakout",sub:"8-Pin 2.54mm Breakout, 8-pin, 21.0\u00d725.0mm",w:21.0,h:25.0,pins:8,icon:'CON',color:'#2a1a1a',holes:[{"x": 10.5, "y": 3.5}, {"x": 10.5, "y": 21.5}],pinout:[{"n": "Pins 1-8 (T568B)", "x": 21.0, "y": 12.5, "s": "right"}]},
+  {id:'con008',cat:'Connectors & Hardware',name:"MicroSD Card SPI Reader Module",sub:"6-Pin 3.3V/5V Level-Shifted, 6-pin, 24.0\u00d742.0mm",w:24.0,h:42.0,pins:6,icon:'CON',color:'#2a1a1a',holes:[{"x": 3.5, "y": 3.5}, {"x": 20.5, "y": 3.5}, {"x": 3.5, "y": 38.5}, {"x": 20.5, "y": 38.5}],pinout:[{"n": "CS", "x": 0, "y": 10.5, "s": "left"}, {"n": "SCK", "x": 0, "y": 21.0, "s": "left"}, {"n": "MOSI", "x": 0, "y": 31.5, "s": "left"}, {"n": "MISO", "x": 24.0, "y": 10.5, "s": "right"}, {"n": "VCC", "x": 24.0, "y": 21.0, "s": "right"}, {"n": "GND", "x": 24.0, "y": 31.5, "s": "right"}]},
+  {id:'con009',cat:'Connectors & Hardware',name:"3.5mm TRS / PJ-301M Jack & 5-Pin DIN",sub:"PCB Mount Jacks, 3-pin, 9.0\u00d714.5mm",w:9.0,h:14.5,pins:3,icon:'CON',color:'#2a1a1a',holes:[],pinout:[{"n": "1:Tip", "x": 0, "y": 7.2, "s": "left"}, {"n": "2:Switch/Ring", "x": 9.0, "y": 7.2, "s": "right"}, {"n": "3:Sleeve", "x": 9.0, "y": 14.5, "s": "right"}]},
+  {id:'con010',cat:'Connectors & Hardware',name:"M2 / M2.5 / M3 Mounting Hole & Keepout Pad",sub:"DRC Keepout Zone, 6.5\u00d76.5mm",w:6.5,h:6.5,pins:0,icon:'CON',color:'#2a1a1a',holes:[],pinout:[{"n": "DRC Keepout Ring (3.2mm drill / 6.5mm head)", "x": 6.5, "y": 3.2, "s": "right"}]},
+  {id:'con011',cat:'Connectors & Hardware',name:"3DPCB Top-to-Bottom Wire Anchor Via Pair",sub:"Twin 1.5mm Pass-Through Holes, 2-pin, 2.54\u00d75.08mm",w:2.54,h:5.08,pins:2,icon:'CON',color:'#2a1a1a',holes:[],pinout:[{"n": "Pass wire from Top Channel to Bottom Channel", "x": 2.54, "y": 2.5, "s": "right"}]},
+];
+
+// ═══════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════
+const state = {
+  components: [],
+  wires: [],
+  channels: [],
+  nets: [
+    { id:'net-vcc', name:'VCC', color:'#FF4444' },
+    { id:'net-gnd', name:'GND', color:'#444444' },
+    { id:'net-sda', name:'SDA', color:'#4488FF' },
+    { id:'net-scl', name:'SCL', color:'#44BBFF' },
+    { id:'net-mosi', name:'MOSI', color:'#FF8844' },
+    { id:'net-miso', name:'MISO', color:'#FFAA44' },
+    { id:'net-sck', name:'SCK', color:'#FFCC44' },
+    { id:'net-5v', name:'5V', color:'#FF6688' },
+    { id:'net-3v3', name:'3V3', color:'#FF88AA' },
+  ],
+  selected: [],
+  tool: 'select',
+  boardW: 150, boardH: 100,
+  channelWidth: 1.8, channelDepth: 1.2,
+  activeLayer: 'top',
+  zoom: 1, panX: 0, panY: 0,
+  gridSize: 2.5,
+  drcResults: [],
+  undoStack: [], redoStack: [],
+  draggingComp: null, draggingOffset: {x:0,y:0},
+  panning: false, panStart: {x:0,y:0},
+  wireStart: null,
+  currentWire: null,
+  nextId: 1,
+  measureStart: null,
+  measureEnd: null,
+};
+
+let PX_PER_MM = 5; // at zoom=1
+
+// ═══════════════════════════════════════════════════════════════
+// CANVAS SETUP
+// ═══════════════════════════════════════════════════════════════
+const canvasWrap = document.getElementById('canvas-wrap');
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas() {
+  canvas.width = canvasWrap.clientWidth;
+  canvas.height = canvasWrap.clientHeight;
+  render();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// COORDINATE HELPERS
+// ═══════════════════════════════════════════════════════════════
+function mmToPx(mm) { return mm * PX_PER_MM * state.zoom; }
+function pxToMm(px) { return px / (PX_PER_MM * state.zoom); }
+
+function boardToCanvas(bx, by) {
+  return {
+    x: state.panX + bx * PX_PER_MM * state.zoom,
+    y: state.panY + by * PX_PER_MM * state.zoom
+  };
+}
+function canvasToBoard(cx, cy) {
+  return {
+    x: (cx - state.panX) / (PX_PER_MM * state.zoom),
+    y: (cy - state.panY) / (PX_PER_MM * state.zoom)
+  };
+}
+function snapToGrid(v) {
+  return Math.round(v / state.gridSize) * state.gridSize;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════════════════
+function render() {
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // Background
+  ctx.fillStyle = '#0A1A0F';
+  ctx.fillRect(0, 0, W, H);
+
+  // Fine grid
+  const gs = mmToPx(state.gridSize);
+  if (gs > 4) {
+    ctx.strokeStyle = 'rgba(0,200,160,0.06)';
+    ctx.lineWidth = 0.5;
+    const bp = boardToCanvas(0, 0);
+    for (let x = bp.x % gs; x < W; x += gs) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+    for (let y = bp.y % gs; y < H; y += gs) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+  }
+
+  // Board boundary
+  const bx = boardToCanvas(0, 0);
+  const bw = mmToPx(state.boardW), bh = mmToPx(state.boardH);
+  ctx.fillStyle = '#0D1E12';
+  ctx.fillRect(bx.x, bx.y, bw, bh);
+  ctx.strokeStyle = '#00C8A0';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(bx.x, bx.y, bw, bh);
+
+  // Board dimension labels
+  if (state.zoom > 0.4) {
+    ctx.fillStyle = 'rgba(0,200,160,0.5)';
+    ctx.font = `${Math.max(9, 10*state.zoom)}px JetBrains Mono, monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText(`${state.boardW}mm`, bx.x + bw/2, bx.y - 6);
+    ctx.save(); ctx.translate(bx.x - 6, bx.y + bh/2); ctx.rotate(-Math.PI/2);
+    ctx.fillText(`${state.boardH}mm`, 0, 0); ctx.restore();
+  }
+
+  // Channels
+  renderChannels();
+
+  // Components
+  for (const comp of state.components) renderComponent(comp);
+
+  // Wire being drawn
+  if (state.wireStart && state.currentWire) {
+    const start = boardToCanvas(state.wireStart.x, state.wireStart.y);
+    const end = boardToCanvas(state.currentWire.x, state.currentWire.y);
+    const net = state.nets.find(n => n.id === state.wireStart.netId);
+    ctx.strokeStyle = net ? net.color : '#00C8A0';
+    ctx.lineWidth = mmToPx(state.channelWidth) * 0.5;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.moveTo(start.x, start.y);
+    // Right-angle routing
+    ctx.lineTo(end.x, start.y);
+    ctx.lineTo(end.x, end.y);
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  // Measurement
+  if (state.measureStart && state.measureEnd) {
+    const s = boardToCanvas(state.measureStart.x, state.measureStart.y);
+    const e = boardToCanvas(state.measureEnd.x, state.measureEnd.y);
+    ctx.strokeStyle = '#F5A623';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(e.x, e.y); ctx.stroke();
+    ctx.setLineDash([]);
+    const dx = state.measureEnd.x - state.measureStart.x;
+    const dy = state.measureEnd.y - state.measureStart.y;
+    const dist = Math.sqrt(dx*dx+dy*dy).toFixed(1);
+    ctx.fillStyle = '#F5A623';
+    ctx.font = `${11*state.zoom}px JetBrains Mono, monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText(`${dist}mm`, (s.x+e.x)/2, (s.y+e.y)/2 - 8);
+  }
+}
+
+function renderChannels() {
+  for (const wire of state.wires) {
+    const net = state.nets.find(n => n.id === wire.netId);
+    let col = net ? net.color : '#00C8A0';
+    let layerCol = wire.layer === 'top' ? col : (wire.layer === 'bottom' ? '#F5A623' : '#9B88FF');
+
+    ctx.strokeStyle = layerCol;
+    ctx.lineWidth = mmToPx(state.channelWidth);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.globalAlpha = 0.55;
+    const pts = wire.points.map(p => boardToCanvas(p.x, p.y));
+    if (pts.length < 2) { ctx.globalAlpha = 1; continue; }
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    // Center line
+    ctx.strokeStyle = layerCol;
+    ctx.lineWidth = 1;
+    ctx.globalAlpha = 0.9;
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    // Net label at midpoint
+    if (state.zoom > 0.5 && net) {
+      const mid = Math.floor(pts.length/2);
+      ctx.fillStyle = layerCol;
+      ctx.font = `bold ${Math.max(7, 8*state.zoom)}px JetBrains Mono, monospace`;
+      ctx.textAlign = 'center';
+      ctx.globalAlpha = 0.9;
+      ctx.fillText(net.name, (pts[0].x+pts[pts.length-1].x)/2, (pts[0].y+pts[pts.length-1].y)/2 - 5);
+      ctx.globalAlpha = 1;
+    }
+  }
+}
+
+function renderComponent(comp) {
+  const isSelected = state.selected.includes(comp.id);
+  const def = COMPONENT_LIBRARY.find(d => d.id === comp.defId);
+  if (!def) return;
+
+  const p = boardToCanvas(comp.x, comp.y);
+  const w = mmToPx(def.w), h = mmToPx(def.h);
+  const r = comp.rot || 0;
+
+  ctx.save();
+  ctx.translate(p.x + w/2, p.y + h/2);
+  ctx.rotate(r * Math.PI/180);
+  ctx.translate(-w/2, -h/2);
+
+  // Body
+  ctx.fillStyle = def.color || '#1a2a1a';
+  ctx.strokeStyle = isSelected ? '#00C8A0' : '#3A4560';
+  ctx.lineWidth = isSelected ? 2 : 1;
+  ctx.beginPath();
+  ctx.roundRect(0, 0, w, h, 3);
+  ctx.fill(); ctx.stroke();
+
+  // Icon label
+  if (w > 15 && h > 8) {
+    ctx.fillStyle = isSelected ? '#00C8A0' : '#7A85A0';
+    ctx.font = `bold ${Math.min(14, Math.max(8, w*0.18))}px JetBrains Mono, monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(def.icon, w/2, h/2);
+  }
+
+  // Comp name below icon
+  if (state.zoom > 0.5 && w > 20) {
+    ctx.fillStyle = 'rgba(232,236,244,0.6)';
+    ctx.font = `${Math.max(7, 8*state.zoom)}px Inter, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(comp.label || def.name, w/2, h - 2);
+  }
+
+  // Mounting holes
+  if (state.zoom > 0.4) {
+    for (const hole of def.holes) {
+      const hx = mmToPx(hole.x), hy = mmToPx(hole.y);
+      ctx.beginPath();
+      ctx.arc(hx, hy, Math.max(2, mmToPx(1.6)), 0, Math.PI*2);
+      ctx.fillStyle = '#0A1A0F';
+      ctx.fill();
+      ctx.strokeStyle = '#5A6580';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+  }
+
+  // Pin dots + labels
+  if (state.zoom > 0.6) {
+    for (const pin of def.pinout) {
+      const px2 = mmToPx(pin.x), py2 = mmToPx(pin.y);
+      ctx.beginPath();
+      ctx.arc(px2, py2, Math.max(1.5, mmToPx(0.5)), 0, Math.PI*2);
+      ctx.fillStyle = '#00C8A0';
+      ctx.fill();
+      if (state.zoom > 1.0) {
+        ctx.fillStyle = 'rgba(0,200,160,0.85)';
+        ctx.font = `${Math.max(6, 7*state.zoom)}px JetBrains Mono, monospace`;
+        ctx.textAlign = pin.s === 'right' ? 'right' : pin.s === 'left' ? 'left' : 'center';
+        ctx.textBaseline = 'middle';
+        const offset = mmToPx(1.2);
+        const lx = pin.s === 'right' ? px2 - offset : pin.s === 'left' ? px2 + offset : px2;
+        const ly = pin.s === 'top' ? py2 + offset : pin.s === 'bottom' ? py2 - offset : py2;
+        ctx.fillText(pin.n, lx, ly);
+      }
+    }
+  }
+
+  // Selection handles
+  if (isSelected) {
+    ctx.strokeStyle = 'rgba(0,200,160,0.4)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3,3]);
+    ctx.strokeRect(-3, -3, w+6, h+6);
+    ctx.setLineDash([]);
+    // Corners
+    for (const [hx, hy] of [[0,0],[w,0],[0,h],[w,h]]) {
+      ctx.fillStyle = '#00C8A0';
+      ctx.fillRect(hx-3, hy-3, 6, 6);
+    }
+  }
+
+  ctx.restore();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// COMPONENT LIBRARY UI
+// ═══════════════════════════════════════════════════════════════
+function buildLibrary(filter='') {
+  const list = document.getElementById('comp-list');
+  list.innerHTML = '';
+  const cats = [...new Set(COMPONENT_LIBRARY.map(c => c.cat))];
+  const q = filter.toLowerCase();
+
+  for (const cat of cats) {
+    const items = COMPONENT_LIBRARY.filter(c => c.cat === cat &&
+      (c.name.toLowerCase().includes(q) || c.sub.toLowerCase().includes(q) || cat.toLowerCase().includes(q)));
+    if (!items.length) continue;
+
+    const catEl = document.createElement('div');
+    catEl.className = 'comp-category';
+    catEl.textContent = cat;
+    list.appendChild(catEl);
+
+    for (const comp of items) {
+      const el = document.createElement('div');
+      el.className = 'comp-item';
+      el.draggable = true;
+      el.dataset.defId = comp.id;
+      el.innerHTML = `
+        <div class="comp-icon" style="border-color:rgba(0,200,160,0.3)">${comp.icon}</div>
+        <div class="comp-info">
+          <div class="comp-name">${comp.name}</div>
+          <div class="comp-sub">${comp.sub}</div>
+        </div>`;
+      el.addEventListener('dragstart', e => {
+        e.dataTransfer.setData('defId', comp.id);
+        el.classList.add('dragging');
+      });
+      el.addEventListener('dragend', () => el.classList.remove('dragging'));
+      list.appendChild(el);
+    }
+  }
+}
+
+document.getElementById('comp-search').addEventListener('input', e => buildLibrary(e.target.value));
+
+canvasWrap.addEventListener('dragover', e => { e.preventDefault(); });
+canvasWrap.addEventListener('drop', e => {
+  e.preventDefault();
+  const defId = e.dataTransfer.getData('defId');
+  if (!defId) return;
+  const rect = canvasWrap.getBoundingClientRect();
+  const board = canvasToBoard(e.clientX - rect.left, e.clientY - rect.top);
+  const def = COMPONENT_LIBRARY.find(d => d.id === defId);
+  if (!def) return;
+  const snap = { x: snapToGrid(board.x - def.w/2), y: snapToGrid(board.y - def.h/2) };
+  pushUndo();
+  state.components.push({ id: `c${state.nextId++}`, defId, x: snap.x, y: snap.y, rot: 0, label: def.name });
+  updateStatus(); updateBOM(); render();
+});
+
+// ═══════════════════════════════════════════════════════════════
+// MOUSE / KEYBOARD INTERACTIONS
+// ═══════════════════════════════════════════════════════════════
+let mouseDown = false, mouseMoved = false;
+let lastMouse = {x:0, y:0};
+
+canvasWrap.addEventListener('mousedown', e => {
+  if (e.button === 1) { state.panning = true; state.panStart = {x: e.clientX - state.panX, y: e.clientY - state.panY}; e.preventDefault(); return; }
+  mouseDown = true; mouseMoved = false;
+  const rect = canvasWrap.getBoundingClientRect();
+  const board = canvasToBoard(e.clientX - rect.left, e.clientY - rect.top);
+  lastMouse = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+
+  if (state.tool === 'select') {
+    const hit = hitTest(board.x, board.y);
+    if (hit) {
+      if (!state.selected.includes(hit.id)) {
+        if (!e.shiftKey) state.selected = [];
+        state.selected.push(hit.id);
+      }
+      state.draggingComp = hit.id;
+      state.draggingOffset = { x: board.x - hit.x, y: board.y - hit.y };
+      showProps(hit);
+    } else {
+      if (!e.shiftKey) state.selected = [];
+      state.draggingComp = null;
+      hideProps();
+    }
+  } else if (state.tool === 'wire') {
+    const snap = { x: snapToGrid(board.x), y: snapToGrid(board.y) };
+    if (!state.wireStart) {
+      state.wireStart = { ...snap, netId: 'net-gnd' };
+    } else {
+      const end = { x: snapToGrid(board.x), y: snapToGrid(board.y) };
+      pushUndo();
+      // Right-angle wire: horizontal then vertical
+      const pts = [
+        { x: state.wireStart.x, y: state.wireStart.y },
+        { x: end.x, y: state.wireStart.y },
+        { x: end.x, y: end.y }
+      ];
+      state.wires.push({ id: `w${state.nextId++}`, points: pts, netId: state.wireStart.netId, layer: state.activeLayer });
+      state.wireStart = { ...end, netId: state.wireStart.netId };
+    }
+  } else if (state.tool === 'measure') {
+    state.measureStart = { x: board.x, y: board.y };
+    state.measureEnd = null;
+  }
+  render();
+});
+
+canvasWrap.addEventListener('mousemove', e => {
+  const rect = canvasWrap.getBoundingClientRect();
+  const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
+  const board = canvasToBoard(cx, cy);
+  const snap = { x: snapToGrid(board.x), y: snapToGrid(board.y) };
+
+  // Update coords
+  document.getElementById('sb-coords').textContent = `x: ${snap.x.toFixed(1)}  y: ${snap.y.toFixed(1)} mm`;
+
+  if (state.panning) {
+    state.panX = e.clientX - state.panStart.x;
+    state.panY = e.clientY - state.panStart.y;
+    render(); return;
+  }
+
+  if (mouseDown && state.draggingComp && state.tool === 'select') {
+    mouseMoved = true;
+    const comp = state.components.find(c => c.id === state.draggingComp);
+    if (comp) {
+      comp.x = snapToGrid(board.x - state.draggingOffset.x);
+      comp.y = snapToGrid(board.y - state.draggingOffset.y);
+      render();
+    }
+    return;
+  }
+
+  if (state.tool === 'wire' && state.wireStart) {
+    state.currentWire = snap;
+    render(); return;
+  }
+
+  if (state.tool === 'measure' && mouseDown && state.measureStart) {
+    state.measureEnd = { x: board.x, y: board.y };
+    render(); return;
+  }
+
+  // Hover tooltip
+  const hit = hitTest(board.x, board.y);
+  const tt = document.getElementById('tooltip');
+  if (hit) {
+    const def = COMPONENT_LIBRARY.find(d => d.id === hit.defId);
+    tt.style.display = 'block';
+    tt.style.left = (cx+12)+'px'; tt.style.top = (cy+12)+'px';
+    tt.querySelector('.tt-name').textContent = hit.label || def?.name || hit.defId;
+    tt.querySelector('.tt-info').textContent = `${def?.sub || ''} · (${hit.x.toFixed(1)}, ${hit.y.toFixed(1)})mm`;
+  } else {
+    tt.style.display = 'none';
+  }
+});
+
+canvasWrap.addEventListener('mouseup', e => {
+  if (e.button === 1) { state.panning = false; return; }
+  mouseDown = false;
+  if (state.draggingComp && mouseMoved) { updateStatus(); render(); }
+  state.draggingComp = null;
+});
+
+canvasWrap.addEventListener('wheel', e => {
+  e.preventDefault();
+  const rect = canvasWrap.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  const factor = e.deltaY < 0 ? 1.12 : 0.89;
+  const newZoom = Math.max(0.1, Math.min(10, state.zoom * factor));
+  state.panX = mx - (mx - state.panX) * (newZoom / state.zoom);
+  state.panY = my - (my - state.panY) * (newZoom / state.zoom);
+  state.zoom = newZoom;
+  document.getElementById('zoom-indicator').textContent = `${Math.round(state.zoom*100)}%`;
+  render();
+}, { passive: false });
+
+canvasWrap.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  const rect = canvasWrap.getBoundingClientRect();
+  const board = canvasToBoard(e.clientX - rect.left, e.clientY - rect.top);
+  const hit = hitTest(board.x, board.y);
+  showContextMenu(e.clientX - rect.left, e.clientY - rect.top, hit);
+});
+
+function hitTest(bx, by) {
+  for (let i = state.components.length-1; i >= 0; i--) {
+    const comp = state.components[i];
+    const def = COMPONENT_LIBRARY.find(d => d.id === comp.defId);
+    if (!def) continue;
+    if (bx >= comp.x && bx <= comp.x+def.w && by >= comp.y && by <= comp.y+def.h) return comp;
+  }
+  return null;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// KEYBOARD
+// ═══════════════════════════════════════════════════════════════
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  if (e.key === 'v' || e.key === 'V') setTool('select');
+  if (e.key === 'w' || e.key === 'W') setTool('wire');
+  if (e.key === 'm' || e.key === 'M') setTool('measure');
+  if (e.key === 'f' || e.key === 'F') fitBoard();
+  if (e.key === 'r' || e.key === 'R') rotateSelected();
+  if (e.key === 'Delete' || e.key === 'Backspace') deleteSelected();
+  if (e.key === 'Escape') {
+    state.selected = [];
+    state.wireStart = null; state.currentWire = null;
+    state.measureStart = null; state.measureEnd = null;
+    document.getElementById('help-panel').style.display = 'none';
+    hideCtxMenu(); render();
+  }
+  if (e.ctrlKey && e.key === 'z') { e.preventDefault(); undo(); }
+  if (e.ctrlKey && e.key === 'y') { e.preventDefault(); redo(); }
+  if (e.ctrlKey && e.key === 'a') { e.preventDefault(); state.selected = state.components.map(c=>c.id); render(); }
+  if (e.ctrlKey && e.key === 'd') { e.preventDefault(); duplicateSelected(); }
+  if (e.key === '?') toggleHelp();
+  if (e.key === '+' || e.key === '=') zoomStep(1.2);
+  if (e.key === '-') zoomStep(0.83);
+});
+
+// ═══════════════════════════════════════════════════════════════
+// TOOLS
+// ═══════════════════════════════════════════════════════════════
+function setTool(t) {
+  state.tool = t;
+  state.wireStart = null; state.currentWire = null;
+  state.measureStart = null; state.measureEnd = null;
+  document.querySelectorAll('#tool-select, #tool-wire, #tool-measure').forEach(b => b.classList.remove('active'));
+  document.getElementById(`tool-${t}`).classList.add('active');
+  document.getElementById('sb-tool').textContent = t.toUpperCase();
+  canvasWrap.style.cursor = t === 'select' ? 'default' : t === 'wire' ? 'crosshair' : 'crosshair';
+}
+
+document.getElementById('tool-select').addEventListener('click', () => setTool('select'));
+document.getElementById('tool-wire').addEventListener('click', () => setTool('wire'));
+document.getElementById('tool-measure').addEventListener('click', () => setTool('measure'));
+
+function zoomStep(factor) {
+  const cx = canvas.width/2, cy = canvas.height/2;
+  const newZoom = Math.max(0.1, Math.min(10, state.zoom * factor));
+  state.panX = cx - (cx - state.panX) * (newZoom / state.zoom);
+  state.panY = cy - (cy - state.panY) * (newZoom / state.zoom);
+  state.zoom = newZoom;
+  document.getElementById('zoom-indicator').textContent = `${Math.round(state.zoom*100)}%`;
+  render();
+}
+
+function fitBoard() {
+  const W = canvas.width, H = canvas.height;
+  const margin = 40;
+  const zx = (W - margin*2) / (state.boardW * PX_PER_MM);
+  const zy = (H - margin*2) / (state.boardH * PX_PER_MM);
+  state.zoom = Math.min(zx, zy);
+  state.panX = (W - state.boardW * PX_PER_MM * state.zoom) / 2;
+  state.panY = (H - state.boardH * PX_PER_MM * state.zoom) / 2;
+  document.getElementById('zoom-indicator').textContent = `${Math.round(state.zoom*100)}%`;
+  render();
+}
+
+document.getElementById('btn-zoom-in').addEventListener('click', () => zoomStep(1.2));
+document.getElementById('btn-zoom-out').addEventListener('click', () => zoomStep(0.83));
+document.getElementById('btn-zoom-fit').addEventListener('click', fitBoard);
+
+function rotateSelected() {
+  pushUndo();
+  for (const id of state.selected) {
+    const comp = state.components.find(c => c.id === id);
+    if (comp) comp.rot = ((comp.rot || 0) + 90) % 360;
+  }
+  render();
+}
+
+function deleteSelected() {
+  if (!state.selected.length) return;
+  pushUndo();
+  state.components = state.components.filter(c => !state.selected.includes(c.id));
+  state.selected = [];
+  hideProps(); updateStatus(); updateBOM(); render();
+}
+
+function duplicateSelected() {
+  if (!state.selected.length) return;
+  pushUndo();
+  const newIds = [];
+  for (const id of state.selected) {
+    const comp = state.components.find(c => c.id === id);
+    if (!comp) continue;
+    const dup = { ...comp, id: `c${state.nextId++}`, x: comp.x + 5, y: comp.y + 5 };
+    state.components.push(dup);
+    newIds.push(dup.id);
+  }
+  state.selected = newIds;
+  updateStatus(); render();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// AUTO-ROUTE
+// ═══════════════════════════════════════════════════════════════
+document.getElementById('btn-route').addEventListener('click', autoRoute);
+
+function autoRoute() {
+  pushUndo();
+  state.wires = [];
+  // For each pair of components, find same-named pins and route channels
+  const allPins = [];
+  for (const comp of state.components) {
+    const def = COMPONENT_LIBRARY.find(d => d.id === comp.defId);
+    if (!def) continue;
+    for (const pin of def.pinout) {
+      const world = pinWorld(comp, pin, def);
+      allPins.push({ compId: comp.id, name: pin.n, x: world.x, y: world.y });
+    }
+  }
+
+  // Group by net name
+  const groups = {};
+  for (const p of allPins) {
+    const net = state.nets.find(n => n.name === p.name);
+    if (!net) {
+      if (!groups['__'+p.name]) groups['__'+p.name] = [];
+      groups['__'+p.name].push(p);
+    } else {
+      if (!groups[net.id]) groups[net.id] = [];
+      groups[net.id].push(p);
+    }
+  }
+
+  // Connect pins in same net with channels
+  for (const [netId, pins] of Object.entries(groups)) {
+    if (pins.length < 2) continue;
+    const net = state.nets.find(n => n.id === netId);
+    const realNetId = net ? net.id : netId;
+    // Chain: 0→1, 1→2, etc
+    for (let i = 0; i < pins.length-1; i++) {
+      const a = pins[i], b = pins[i+1];
+      const pts = routeRightAngle(a.x, a.y, b.x, b.y);
+      state.wires.push({ id: `w${state.nextId++}`, points: pts, netId: realNetId.startsWith('__') ? 'net-gnd' : realNetId, layer: state.activeLayer });
+    }
+  }
+
+  updateStatus(); runDRC(); render();
+}
+
+function pinWorld(comp, pin, def) {
+  const r = (comp.rot || 0) * Math.PI / 180;
+  const cx = comp.x + def.w/2, cy = comp.y + def.h/2;
+  const lx = pin.x - def.w/2, ly = pin.y - def.h/2;
+  return {
+    x: cx + lx * Math.cos(r) - ly * Math.sin(r),
+    y: cy + lx * Math.sin(r) + ly * Math.cos(r)
+  };
+}
+
+function routeRightAngle(x1, y1, x2, y2) {
+  const mx = snapToGrid((x1+x2)/2);
+  return [
+    { x: snapToGrid(x1), y: snapToGrid(y1) },
+    { x: mx, y: snapToGrid(y1) },
+    { x: mx, y: snapToGrid(y2) },
+    { x: snapToGrid(x2), y: snapToGrid(y2) }
+  ];
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DRC
+// ═══════════════════════════════════════════════════════════════
+document.getElementById('btn-drc').addEventListener('click', () => { runDRC(); switchTab('drc'); });
+
+function runDRC() {
+  const results = [];
+  const margin = 2;
+
+  for (const comp of state.components) {
+    const def = COMPONENT_LIBRARY.find(d => d.id === comp.defId);
+    if (!def) continue;
+    // Off-board check
+    if (comp.x < 0 || comp.y < 0 || comp.x + def.w > state.boardW || comp.y + def.h > state.boardH) {
+      results.push({ type:'error', msg: `${comp.label || def.name} extends outside board boundary` });
+    }
+    // Near-edge check
+    if (comp.x < margin || comp.y < margin || comp.x + def.w > state.boardW - margin || comp.y + def.h > state.boardH - margin) {
+      if (comp.x >= 0 && comp.y >= 0 && comp.x + def.w <= state.boardW && comp.y + def.h <= state.boardH) {
+        results.push({ type:'warn', msg: `${comp.label || def.name} is within ${margin}mm of board edge` });
+      }
+    }
+  }
+
+  // Check for overlapping components
+  for (let i = 0; i < state.components.length; i++) {
+    for (let j = i+1; j < state.components.length; j++) {
+      const a = state.components[i], b = state.components[j];
+      const da = COMPONENT_LIBRARY.find(d => d.id === a.defId);
+      const db = COMPONENT_LIBRARY.find(d => d.id === b.defId);
+      if (!da || !db) continue;
+      if (a.x < b.x+db.w && a.x+da.w > b.x && a.y < b.y+db.h && a.y+da.h > b.y) {
+        results.push({ type:'error', msg: `${a.label||da.name} overlaps ${b.label||db.name}` });
+      }
+    }
+  }
+
+  // Channel count stats
+  if (state.wires.length === 0 && state.components.length > 0) {
+    results.push({ type:'warn', msg: 'No channels routed — run Auto-route or draw manually' });
+  }
+
+  if (results.length === 0 && state.components.length > 0) {
+    results.push({ type:'ok', msg: 'No DRC violations found' });
+  }
+
+  state.drcResults = results;
+  renderDRC();
+  const errors = results.filter(r=>r.type==='error').length;
+  const warns = results.filter(r=>r.type==='warn').length;
+  const sb = document.getElementById('sb-drc');
+  if (errors) sb.textContent = `DRC: ${errors} error${errors>1?'s':''}`, sb.style.color = '#FF5566';
+  else if (warns) sb.textContent = `DRC: ${warns} warning${warns>1?'s':''}`, sb.style.color = '#F5A623';
+  else sb.textContent = 'DRC: OK', sb.style.color = '#00C8A0';
+}
+
+function renderDRC() {
+  const el = document.getElementById('drc-results');
+  if (!state.drcResults.length) { el.innerHTML = '<div style="color:var(--text-muted);font-size:12px">Run DRC to check your layout.</div>'; return; }
+  el.innerHTML = state.drcResults.map(r =>
+    `<div class="drc-item ${r.type}"><span class="drc-icon">${r.type==='error'?'✖':r.type==='warn'?'⚠':'✔'}</span>${r.msg}</div>`
+  ).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PROPS PANEL
+// ═══════════════════════════════════════════════════════════════
+function showProps(comp) {
+  const def = COMPONENT_LIBRARY.find(d => d.id === comp.defId);
+  if (!def) return;
+  document.getElementById('no-selection').style.display = 'none';
+  const el = document.getElementById('selection-props');
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div class="prop-group">
+      <div class="prop-group-title">${def.name}</div>
+      <div class="prop-row"><span class="prop-label">ID</span><span class="prop-val">${comp.id}</span></div>
+      <div class="prop-row"><span class="prop-label">Label</span><input class="prop-input full" id="prop-label" value="${comp.label||def.name}"></div>
+      <div class="prop-row"><span class="prop-label">X</span><input class="prop-input" id="prop-x" value="${comp.x.toFixed(1)}"><span class="prop-label">mm</span></div>
+      <div class="prop-row"><span class="prop-label">Y</span><input class="prop-input" id="prop-y" value="${comp.y.toFixed(1)}"><span class="prop-label">mm</span></div>
+      <div class="prop-row"><span class="prop-label">Rotation</span>
+        <select class="prop-select" id="prop-rot">
+          <option value="0" ${comp.rot===0?'selected':''}>0°</option>
+          <option value="90" ${comp.rot===90?'selected':''}>90°</option>
+          <option value="180" ${comp.rot===180?'selected':''}>180°</option>
+          <option value="270" ${comp.rot===270?'selected':''}>270°</option>
+        </select>
+      </div>
+    </div>
+    <div class="prop-group">
+      <div class="prop-group-title">Component info</div>
+      <div class="prop-row"><span class="prop-label">Type</span><span class="prop-val">${comp.defId}</span></div>
+      <div class="prop-row"><span class="prop-label">Size</span><span class="prop-val">${def.w}×${def.h}mm</span></div>
+      <div class="prop-row"><span class="prop-label">Pins</span><span class="prop-val">${def.pins}</span></div>
+      <div class="prop-row"><span class="prop-label">Holes</span><span class="prop-val">${def.holes.length}</span></div>
+    </div>
+    <div class="prop-group">
+      <div class="prop-group-title">Actions</div>
+      <button class="export-btn" onclick="rotateSelected()" style="padding:6px 10px"><span class="eb-icon">↻</span><div class="eb-info"><div class="eb-title">Rotate 90°</div></div></button>
+      <button class="export-btn danger" onclick="deleteSelected()" style="padding:6px 10px;border-color:rgba(255,85,102,0.3);color:var(--danger)"><span class="eb-icon">🗑</span><div class="eb-info"><div class="eb-title">Delete</div></div></button>
+    </div>`;
+
+  document.getElementById('prop-label').addEventListener('change', e => { comp.label = e.target.value; render(); });
+  document.getElementById('prop-x').addEventListener('change', e => { comp.x = parseFloat(e.target.value)||0; render(); });
+  document.getElementById('prop-y').addEventListener('change', e => { comp.y = parseFloat(e.target.value)||0; render(); });
+  document.getElementById('prop-rot').addEventListener('change', e => { comp.rot = parseInt(e.target.value); render(); });
+}
+
+function hideProps() {
+  document.getElementById('no-selection').style.display = '';
+  document.getElementById('selection-props').style.display = 'none';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// NETS
+// ═══════════════════════════════════════════════════════════════
+function renderNets() {
+  const el = document.getElementById('nets-list');
+  el.innerHTML = state.nets.map(n => `
+    <div class="net-item">
+      <div class="net-swatch" style="background:${n.color}"></div>
+      <span class="net-label">${n.name}</span>
+      <span class="net-count">${state.wires.filter(w=>w.netId===n.id).length} ch</span>
+    </div>`).join('');
+  document.getElementById('sb-nets').textContent = `${state.nets.length} nets`;
+}
+
+document.getElementById('btn-add-net').addEventListener('click', () => {
+  showModal('Add Net', `
+    <div class="modal-row"><label class="modal-label">Net name</label><input class="modal-input" id="m-net-name" placeholder="e.g. DATA" autocomplete="off"></div>
+    <div class="modal-row"><label class="modal-label">Color</label><input type="color" class="modal-input" id="m-net-color" value="#44FFAA" style="cursor:pointer;padding:2px 4px;height:30px"></div>`,
+    [{ label: 'Cancel', action: closeModal },
+     { label: 'Add Net', primary: true, action: () => {
+       const name = document.getElementById('m-net-name').value.trim().toUpperCase();
+       const color = document.getElementById('m-net-color').value;
+       if (!name) return;
+       state.nets.push({ id: `net-${state.nextId++}`, name, color });
+       renderNets(); closeModal();
+     }}]);
+});
+
+// ═══════════════════════════════════════════════════════════════
+// BOARD SETTINGS
+// ═══════════════════════════════════════════════════════════════
+document.getElementById('board-w').addEventListener('change', e => { state.boardW = parseFloat(e.target.value)||150; render(); });
+document.getElementById('board-h').addEventListener('change', e => { state.boardH = parseFloat(e.target.value)||100; render(); });
+document.getElementById('channel-gauge').addEventListener('change', e => {
+  if (e.target.value === 'custom') return;
+  state.channelWidth = parseFloat(e.target.value);
+});
+document.getElementById('channel-depth').addEventListener('change', e => { state.channelDepth = parseFloat(e.target.value)||1.2; });
+
+// Layer toggle
+['top','bottom','both'].forEach(l => {
+  document.getElementById(`layer-${l}`).addEventListener('click', () => {
+    state.activeLayer = l;
+    document.querySelectorAll('.layer-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(`layer-${l}`).classList.add('active');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════════════════════════
+document.querySelectorAll('.props-tab').forEach(tab => {
+  tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+});
+
+function switchTab(name) {
+  document.querySelectorAll('.props-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  ['props','nets','drc','export'].forEach(p => {
+    const el = document.getElementById(`${p}-pane`);
+    el.style.display = p === name ? 'block' : 'none';
+  });
+  if (name === 'nets') renderNets();
+  if (name === 'drc') renderDRC();
+  if (name === 'export') updateBOM();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CONTEXT MENU
+// ═══════════════════════════════════════════════════════════════
+function showContextMenu(x, y, comp) {
+  const menu = document.getElementById('ctx-menu');
+  menu.style.display = 'block';
+  menu.style.left = x+'px'; menu.style.top = y+'px';
+  menu.innerHTML = '';
+  const items = comp ? [
+    { icon:'↻', label:'Rotate 90°', fn: rotateSelected },
+    { icon:'⧉', label:'Duplicate', fn: duplicateSelected },
+    { icon:'✂', label:'Delete', fn: deleteSelected, red: true },
+    { sep: true },
+    { icon:'↔', label:'To front', fn: () => { const i=state.components.indexOf(comp); state.components.push(state.components.splice(i,1)[0]); render(); }},
+    { icon:'↕', label:'To back', fn: () => { const i=state.components.indexOf(comp); state.components.unshift(state.components.splice(i,1)[0]); render(); }},
+  ] : [
+    { icon:'⚡', label:'Auto-route', fn: autoRoute },
+    { icon:'✓', label:'Run DRC', fn: () => { runDRC(); switchTab('drc'); }},
+    { icon:'⬜', label:'Clear all channels', fn: () => { pushUndo(); state.wires=[]; render(); updateStatus(); }},
+    { sep:true },
+    { icon:'↔', label:'Fit board', fn: fitBoard },
+  ];
+  for (const item of items) {
+    if (item.sep) { const s=document.createElement('div'); s.style.cssText='border-top:1px solid var(--border);margin:3px 0'; menu.appendChild(s); continue; }
+    const el=document.createElement('div'); el.className='ctx-item'+(item.red?' red':'');
+    el.innerHTML = `<span>${item.icon}</span><span>${item.label}</span>`;
+    el.addEventListener('click', () => { item.fn(); hideCtxMenu(); });
+    menu.appendChild(el);
+  }
+  setTimeout(()=>document.addEventListener('click',hideCtxMenu,{once:true}), 10);
+}
+function hideCtxMenu() { document.getElementById('ctx-menu').style.display='none'; }
+
+// ═══════════════════════════════════════════════════════════════
+// UNDO / REDO
+// ═══════════════════════════════════════════════════════════════
+function pushUndo() {
+  state.undoStack.push(JSON.stringify({ components: state.components, wires: state.wires }));
+  if (state.undoStack.length > 50) state.undoStack.shift();
+  state.redoStack = [];
+}
+function undo() {
+  if (!state.undoStack.length) return;
+  state.redoStack.push(JSON.stringify({ components: state.components, wires: state.wires }));
+  const snap = JSON.parse(state.undoStack.pop());
+  state.components = snap.components; state.wires = snap.wires;
+  state.selected = []; render(); updateStatus(); updateBOM();
+}
+function redo() {
+  if (!state.redoStack.length) return;
+  state.undoStack.push(JSON.stringify({ components: state.components, wires: state.wires }));
+  const snap = JSON.parse(state.redoStack.pop());
+  state.components = snap.components; state.wires = snap.wires;
+  render(); updateStatus(); updateBOM();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SAVE / LOAD / NEW
+// ═══════════════════════════════════════════════════════════════
+document.getElementById('btn-save').addEventListener('click', () => {
+  const data = JSON.stringify({ boardW: state.boardW, boardH: state.boardH, channelWidth: state.channelWidth, channelDepth: state.channelDepth, components: state.components, wires: state.wires, nets: state.nets }, null, 2);
+  download('board-layout.json', data, 'application/json');
+});
+document.getElementById('btn-open').addEventListener('click', () => {
+  const inp = document.createElement('input'); inp.type='file'; inp.accept='.json';
+  inp.onchange = e => {
+    const f = e.target.files[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = ev => {
+      try {
+        const d = JSON.parse(ev.target.result);
+        Object.assign(state, { boardW: d.boardW||150, boardH: d.boardH||100, channelWidth: d.channelWidth||1.8, channelDepth: d.channelDepth||1.2, components: d.components||[], wires: d.wires||[], nets: d.nets||state.nets });
+        document.getElementById('board-w').value = state.boardW;
+        document.getElementById('board-h').value = state.boardH;
+        fitBoard(); updateStatus(); updateBOM(); render();
+      } catch(err) { alert('Invalid layout file'); }
+    };
+    r.readAsText(f);
+  };
+  inp.click();
+});
+document.getElementById('btn-new').addEventListener('click', () => {
+  if (!state.components.length || confirm('Start a new board? Unsaved work will be lost.')) {
+    pushUndo();
+    state.components = []; state.wires = []; state.selected = [];
+    state.boardW = 150; state.boardH = 100;
+    document.getElementById('board-w').value = 150;
+    document.getElementById('board-h').value = 100;
+    fitBoard(); updateStatus(); updateBOM(); render();
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+// EXPORT
+// ═══════════════════════════════════════════════════════════════
+document.getElementById('exp-json').addEventListener('click', () => document.getElementById('btn-save').click());
+
+document.getElementById('exp-scad').addEventListener('click', () => {
+  const lines = [
+    '// 3DPCB Wire Channel Board — Generated by Wire Channel Board Designer',
+    `// Board: ${state.boardW}mm × ${state.boardH}mm`,
+    `// Channel width: ${state.channelWidth}mm, depth: ${state.channelDepth}mm`,
+    '',
+    `board_w = ${state.boardW};`,
+    `board_h = ${state.boardH};`,
+    `board_thickness = 4;`,
+    `channel_w = ${state.channelWidth};`,
+    `channel_d = ${state.channelDepth};`,
+    `hole_d = 3.2;  // M3 mounting holes`,
+    '',
+    'module board() {',
+    '  difference() {',
+    '    // Board body',
+    '    linear_extrude(board_thickness)',
+    '      square([board_w, board_h]);',
+    '',
+    '    // Wire channels (top face)',
+    ...state.wires.filter(w=>w.layer==='top'||w.layer==='both').flatMap((wire,i) => {
+      const pts = wire.points;
+      const lines2 = [`    // Channel ${i+1} (net: ${wire.netId})`];
+      for (let j=0; j<pts.length-1; j++) {
+        const a=pts[j], b=pts[j+1];
+        if (Math.abs(a.x-b.x)<0.01 && Math.abs(a.y-b.y)<0.01) continue;
+        const dx=b.x-a.x, dy=b.y-a.y;
+        const len=Math.sqrt(dx*dx+dy*dy);
+        const angle=Math.atan2(dy,dx)*180/Math.PI;
+        const mx=(a.x+b.x)/2, my=(a.y+b.y)/2;
+        lines2.push(`    translate([${mx.toFixed(2)}, ${my.toFixed(2)}, board_thickness-channel_d])`);
+        lines2.push(`      rotate([0, 0, ${angle.toFixed(1)}])`);
+        lines2.push(`        translate([-${(len/2).toFixed(2)}, -channel_w/2, 0])`);
+        lines2.push(`          cube([${len.toFixed(2)}, channel_w, channel_d+0.1]);`);
+      }
+      return lines2;
+    }),
+    '',
+    '    // Mounting holes',
+    ...state.components.flatMap(comp => {
+      const def = COMPONENT_LIBRARY.find(d=>d.id===comp.defId);
+      if (!def) return [];
+      return def.holes.map(h =>
+        `    translate([${(comp.x+h.x).toFixed(2)}, ${(comp.y+h.y).toFixed(2)}, -0.1]) cylinder(d=hole_d, h=board_thickness+0.2, $fn=20);`
+      );
+    }),
+    '  }',
+    '}',
+    '',
+    'board();',
+    '',
+    '// Component positions (for reference)',
+    ...state.components.map(comp => {
+      const def = COMPONENT_LIBRARY.find(d=>d.id===comp.defId);
+      return `// ${comp.label||def?.name||comp.defId}: [${comp.x.toFixed(1)}, ${comp.y.toFixed(1)}] ${def?.w}×${def?.h}mm`;
+    }),
+  ];
+  download('board.scad', lines.join('\n'), 'text/plain');
+});
+
+document.getElementById('exp-stl').addEventListener('click', () => {
+  // Generate ASCII STL from board geometry
+  const thickness = 4;
+  const cw = state.channelWidth, cd = state.channelDepth;
+  const bw = state.boardW, bh = state.boardH;
+
+  const tris = [];
+
+  // Board base box (simplified — full STL would need boolean ops)
+  // Emit board as a solid box; in practice OpenSCAD is better for the full boolean
+  addBox(tris, 0,0,0, bw,bh,thickness);
+
+  // Channel cutouts as negative-space annotations in comments
+  // (Full boolean STL requires CSG library; we export the board body + comment guide)
+  const stl = [`solid board`,
+    ...tris.map(t => [
+      `  facet normal ${t.n.join(' ')}`,
+      `    outer loop`,
+      ...t.v.map(v=>`      vertex ${v.join(' ')}`),
+      `    endloop`,
+      `  endfacet`
+    ].join('\n')),
+    `endsolid board`
+  ].join('\n');
+
+  download('board.stl', stl, 'application/octet-stream');
+  alert('STL exported as board body.\nFor full channel cutouts with correct boolean geometry, use the OpenSCAD export and render in OpenSCAD.');
+});
+
+function addBox(tris, x,y,z, w,h,d) {
+  const v = [
+    [x,y,z],[x+w,y,z],[x+w,y+h,z],[x,y+h,z],
+    [x,y,z+d],[x+w,y,z+d],[x+w,y+h,z+d],[x,y+h,z+d]
+  ];
+  const faces = [[0,1,2,0,2,3],[4,6,5,4,7,6],[0,4,5,0,5,1],[1,5,6,1,6,2],[2,6,7,2,7,3],[3,7,4,3,4,0]];
+  const norms = [[0,0,-1],[0,0,1],[0,-1,0],[1,0,0],[0,1,0],[-1,0,0]];
+  faces.forEach((f,i) => {
+    tris.push({ n:norms[i].map(n=>n.toFixed(6)), v:[v[f[0]],v[f[1]],v[f[2]]].map(p=>p.map(n=>n.toFixed(4))) });
+    tris.push({ n:norms[i].map(n=>n.toFixed(6)), v:[v[f[3]],v[f[4]],v[f[5]]].map(p=>p.map(n=>n.toFixed(4))) });
+  });
+}
+
+document.getElementById('exp-bom').addEventListener('click', () => {
+  const counts = {};
+  for (const comp of state.components) {
+    counts[comp.defId] = (counts[comp.defId]||0)+1;
+  }
+  const rows = [['Component','Part ID','Qty','Size (mm)','Pins','Notes']];
+  for (const [defId, qty] of Object.entries(counts)) {
+    const def = COMPONENT_LIBRARY.find(d=>d.id===defId);
+    rows.push([def?.name||defId, defId, qty, `${def?.w}×${def?.h}`, def?.pins||'', def?.sub||'']);
+  }
+  const csv = rows.map(r => r.map(c=>`"${c}"`).join(',')).join('\n');
+  download('bom.csv', csv, 'text/csv');
+});
+
+document.getElementById('exp-wiring').addEventListener('click', () => {
+  const scale = 3;
+  const W = state.boardW * scale, H = state.boardH * scale;
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" style="background:#0D1E12">`;
+  svg += `<rect width="${W}" height="${H}" fill="#0D1E12" stroke="#00C8A0" stroke-width="1"/>`;
+
+  for (const wire of state.wires) {
+    const net = state.nets.find(n=>n.id===wire.netId);
+    const col = net?.color||'#00C8A0';
+    if (wire.points.length < 2) continue;
+    const pts = wire.points.map(p=>`${p.x*scale},${p.y*scale}`).join(' ');
+    svg += `<polyline points="${pts}" fill="none" stroke="${col}" stroke-width="${state.channelWidth*scale*0.5}" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>`;
+  }
+  for (const comp of state.components) {
+    const def = COMPONENT_LIBRARY.find(d=>d.id===comp.defId);
+    if (!def) continue;
+    svg += `<rect x="${comp.x*scale}" y="${comp.y*scale}" width="${def.w*scale}" height="${def.h*scale}" fill="${def.color||'#1a2a1a'}" stroke="#3A4560" stroke-width="0.5" rx="2"/>`;
+    svg += `<text x="${(comp.x+def.w/2)*scale}" y="${(comp.y+def.h/2)*scale}" fill="#7A85A0" font-size="${Math.min(10,def.w*scale*0.3)}" text-anchor="middle" dominant-baseline="middle" font-family="monospace">${def.icon}</text>`;
+  }
+  // Legend
+  let ly = 10;
+  for (const net of state.nets) {
+    if (!state.wires.find(w=>w.netId===net.id)) continue;
+    svg += `<rect x="${W+4}" y="${ly}" width="10" height="10" fill="${net.color}" rx="1"/>`;
+    svg += `<text x="${W+18}" y="${ly+8}" fill="#E8ECF4" font-size="9" font-family="monospace">${net.name}</text>`;
+    ly += 14;
+  }
+  svg += '</svg>';
+  download('wiring-legend.svg', svg, 'image/svg+xml');
+});
+
+function download(name, content, type) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content], { type }));
+  a.download = name; a.click();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BOM
+// ═══════════════════════════════════════════════════════════════
+function updateBOM() {
+  const counts = {};
+  for (const comp of state.components) counts[comp.defId]=(counts[comp.defId]||0)+1;
+  const el = document.getElementById('bom-preview');
+  if (!Object.keys(counts).length) { el.innerHTML = '<div style="color:var(--text-muted);font-size:11px">No components placed.</div>'; return; }
+  el.innerHTML = `<table class="bom-table"><thead><tr><th>Component</th><th>Qty</th><th>Size</th></tr></thead><tbody>
+    ${Object.entries(counts).map(([defId,qty])=>{
+      const def = COMPONENT_LIBRARY.find(d=>d.id===defId);
+      return `<tr><td>${def?.name||defId}</td><td>${qty}</td><td>${def?.w}×${def?.h}</td></tr>`;
+    }).join('')}
+  </tbody></table>`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// STATUS BAR
+// ═══════════════════════════════════════════════════════════════
+function updateStatus() {
+  document.getElementById('sb-components').textContent = `${state.components.length} component${state.components.length!==1?'s':''}`;
+  document.getElementById('sb-channels').textContent = `${state.wires.length} channel${state.wires.length!==1?'s':''}`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CUSTOM COMPONENT
+// ═══════════════════════════════════════════════════════════════
+document.getElementById('btn-add-custom').addEventListener('click', () => {
+  showModal('Add Custom Component', `
+    <div class="modal-row"><label class="modal-label">Name</label><input class="modal-input" id="cc-name" placeholder="e.g. My Sensor Module" autocomplete="off"></div>
+    <div class="modal-row"><label class="modal-label">Icon (3–4 chars)</label><input class="modal-input" id="cc-icon" placeholder="SEN" maxlength="4" autocomplete="off"></div>
+    <div class="modal-row"><label class="modal-label">Width (mm)</label><input class="modal-input" id="cc-w" placeholder="20" type="number" min="1" autocomplete="off"></div>
+    <div class="modal-row"><label class="modal-label">Height (mm)</label><input class="modal-input" id="cc-h" placeholder="15" type="number" min="1" autocomplete="off"></div>
+    <div class="modal-row"><label class="modal-label">Pin count</label><input class="modal-input" id="cc-pins" placeholder="8" type="number" min="1" autocomplete="off"></div>
+    <div class="modal-row"><label class="modal-label">Category</label><input class="modal-input" id="cc-cat" placeholder="Custom" autocomplete="off"></div>`,
+    [{ label:'Cancel', action: closeModal },
+     { label:'Add', primary:true, action: () => {
+       const name = document.getElementById('cc-name').value.trim();
+       const icon = document.getElementById('cc-icon').value.trim()||'CUS';
+       const w = parseFloat(document.getElementById('cc-w').value)||20;
+       const h = parseFloat(document.getElementById('cc-h').value)||15;
+       const pins = parseInt(document.getElementById('cc-pins').value)||4;
+       const cat = document.getElementById('cc-cat').value.trim()||'Custom';
+       if (!name) return;
+       const id = `custom-${state.nextId++}`;
+       const pinout = [];
+       const pstep = h/(Math.ceil(pins/2)+1);
+       for (let i=0; i<Math.ceil(pins/2); i++) pinout.push({n:`P${i+1}`,x:0,y:pstep*(i+1),s:'left'});
+       for (let i=0; i<Math.floor(pins/2); i++) pinout.push({n:`P${Math.ceil(pins/2)+i+1}`,x:w,y:pstep*(i+1),s:'right'});
+       COMPONENT_LIBRARY.push({ id, cat, name, sub:`Custom, ${w}×${h}mm`, w, h, pins, icon, color:'#2a2a3a', holes:[{x:2,y:2},{x:2,y:h-2},{x:w-2,y:2},{x:w-2,y:h-2}], pinout });
+       buildLibrary(document.getElementById('comp-search').value);
+       closeModal();
+     }}]);
+});
+
+// ═══════════════════════════════════════════════════════════════
+// MODAL
+// ═══════════════════════════════════════════════════════════════
+function showModal(title, bodyHtml, actions) {
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-body').innerHTML = bodyHtml;
+  const actEl = document.getElementById('modal-actions');
+  actEl.innerHTML = '';
+  for (const a of actions) {
+    const btn = document.createElement('button');
+    btn.className = 'modal-btn' + (a.primary?' primary':'');
+    btn.textContent = a.label;
+    btn.addEventListener('click', a.action);
+    actEl.appendChild(btn);
+  }
+  document.getElementById('modal-overlay').classList.add('show');
+  setTimeout(()=>{ const f=document.querySelector('.modal-input'); if(f)f.focus(); },50);
+}
+function closeModal() { document.getElementById('modal-overlay').classList.remove('show'); }
+document.getElementById('modal-overlay').addEventListener('click', e => { if(e.target===e.currentTarget) closeModal(); });
+
+// ═══════════════════════════════════════════════════════════════
+// HELP
+// ═══════════════════════════════════════════════════════════════
+document.getElementById('btn-help').addEventListener('click', toggleHelp);
+function toggleHelp() {
+  const p = document.getElementById('help-panel');
+  p.style.display = p.style.display==='block' ? 'none' : 'block';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
+buildLibrary();
+resizeCanvas();
+fitBoard();
+updateStatus();
+updateBOM();
+
+window.addEventListener('resize', () => { resizeCanvas(); fitBoard(); });
+
+// Drop a demo component to show it working
+setTimeout(() => {
+  state.components.push({ id:`c${state.nextId++}`, defId:'esp32-wroom', x:20, y:30, rot:0, label:'ESP32-WROOM-32' });
+  state.components.push({ id:`c${state.nextId++}`, defId:'pot-alpha-9mm', x:70, y:20, rot:0, label:'Vol Pot' });
+  state.components.push({ id:`c${state.nextId++}`, defId:'pot-alpha-9mm', x:85, y:20, rot:0, label:'Freq Pot' });
+  state.components.push({ id:`c${state.nextId++}`, defId:'btn-12mm', x:70, y:40, rot:0, label:'Trigger' });
+  state.components.push({ id:`c${state.nextId++}`, defId:'pcm5102', x:70, y:60, rot:0, label:'DAC' });
+  state.components.push({ id:`c${state.nextId++}`, defId:'oled-128x64', x:95, y:30, rot:0, label:'Display' });
+  updateStatus(); updateBOM(); render();
+}, 100);
+</script>
+</body>
+</html>
