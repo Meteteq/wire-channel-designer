@@ -16,6 +16,15 @@ Inspired by Johan von Konow's 3DPCB method (Print a Synth, 3DPCBoy).
 ---
 
 
+
+## The board it makes
+
+The grooves are cut straight into the print. Lay hookup wire in them, push the parts through and solder.
+
+| Grooves in low light | Close-up of the channels | With the parts fitted |
+|---|---|---|
+| ![The printed board lit from the side so the wire grooves cast shadows](images/promo-5-grooves-raking.png) | ![Close-up of the wire channels and component holes](images/promo-6-grooves-closeup.png) | ![The finished board with knobs, buttons and screen fitted](images/promo-1-assembled.png) |
+
 ## Screenshots
 
 | Build for me | Searching 1,500+ parts | One-tap fixes |
