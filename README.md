@@ -1,5 +1,7 @@
 # Wire Channel Designer
 
+[![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-support%20this%20tool-ffdd00?logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/metet)
+
 **Design 3D-printable circuit boards with grooves for your wires, right in your browser.**
 Drop parts on a board (or on any STL you like), auto-route the channels, check it in 3D, and export a watertight STL ready to slice. Then print it, lay hookup wire in the grooves, push the parts through and solder.
 
@@ -60,3 +62,7 @@ The extra parts come from the Fritzing, SparkFun and Adafruit part libraries (CC
 MIT. Use it, fork it, sell things you make with it. Credit appreciated.
 
 Made by Kris / Cerebral Meltdown Records.
+
+## Support
+
+Wire Channel Designer is free and always will be. If it saved you time, you can [buy me a coffee](https://buymeacoffee.com/metet). It helps me keep adding parts and features.
