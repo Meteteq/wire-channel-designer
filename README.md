@@ -5,6 +5,8 @@
 **Design 3D-printable circuit boards with grooves for your wires, right in your browser.**
 Drop parts on a board (or on any STL you like), auto-route the channels, check it in 3D, and export a watertight STL ready to slice. Then print it, lay hookup wire in the grooves, push the parts through and solder.
 
+![A synth controller enclosure built by Wire Channel Designer](images/launch-2-enclosure.png)
+
 **▶ Open the tool:** https://meteteq.github.io/wire-channel-designer
 
 No install, no account, no server. It's one HTML file and works offline.
@@ -12,6 +14,13 @@ No install, no account, no server. It's one HTML file and works offline.
 Inspired by Johan von Konow's 3DPCB method (Print a Synth, 3DPCBoy).
 
 ---
+
+
+## Screenshots
+
+| Build for me | Searching 1,500+ parts | One-tap fixes |
+|---|---|---|
+| ![The Build for me window with the Synth controller preset](images/launch-1-build-for-me.png) | ![Searching the parts library for Feather boards](images/launch-3-parts-search.png) | ![A warning with a Move it to a suitable pin button](images/launch-4-fix-it.png) |
 
 ## What it does
 
