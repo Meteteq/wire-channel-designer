@@ -13,9 +13,11 @@ No install, no account, no server. It's one HTML file and works offline.
 
 Inspired by Johan von Konow's 3DPCB method (Print a Synth, 3DPCBoy).
 
+## Why I made this
+
+I'm a disability support worker in Queensland, Australia, and some of my clients have low vision. I've supported them to test new tech alongside QUT, aiming for more independence and better access to technology. I want to build tactile instruments and controllers that fit each person, and etched PCBs were too big a barrier for one-off builds. So I made this tool to be easy to use: for me, for beginners who've never designed a circuit board, and for my clients themselves. You drop your parts on, press one button, and it does the technical work for you. It's my starting point for making custom, accessible hardware that anyone can design, print and wire at home.
+
 ---
-
-
 
 ## The board it makes
 
