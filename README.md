@@ -15,7 +15,11 @@ Inspired by Johan von Konow's 3DPCB method (Print a Synth, 3DPCBoy).
 
 ## Why I made this
 
-I'm a disability support worker in Queensland, Australia, and some of my clients have low vision. I've supported them to test new tech alongside QUT, aiming for more independence and better access to technology. I want to build tactile instruments and controllers that fit each person, and etched PCBs were too big a barrier for one-off builds. So I made this tool to be easy to use: for me, for beginners who've never designed a circuit board, and for my clients themselves. You drop your parts on, press one button, and it does the technical work for you. It's my starting point for making custom, accessible hardware that anyone can design, print and wire at home.
+* **The Background:** I’ve spent 15+ years as a disability support worker in Queensland, including collaborating with QUT to help clients trial new assistive tech for better digital access and independence.
+* **The Problem:** Every person needs something different. Building custom tactile instruments and adaptive controllers meant dealing with etched PCBs—too slow, expensive, and complex for one-off builds.
+* **The Solution:** A zero-barrier wire-channel designer built for beginners, makers, and clients alike. Drop your components on, hit one button, and let the tool handle the routing.
+
+My goal is simple: make custom, accessible hardware that anyone can design, 3D print, and wire up at home.
 
 ---
 
